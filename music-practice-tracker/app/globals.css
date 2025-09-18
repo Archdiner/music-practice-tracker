@@ -1,7 +1,7 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
 
 :root {
   /* Updated to warm palette with cream background and apricot accents */
@@ -40,88 +40,6 @@
   --sidebar-accent-foreground: #1f2937;
   --sidebar-border: #f5e9da;
   --sidebar-ring: #f39c6b;
-}
-
-.dark {
-  /* Keep same warm palette for dark mode consistency */
-  --background: #fff8f1;
-  --foreground: #1f2937;
-  --card: #fffbf6;
-  --card-foreground: #1f2937;
-  --popover: #fffbf6;
-  --popover-foreground: #1f2937;
-  --primary: #f39c6b;
-  --primary-foreground: #ffffff;
-  --secondary: #c85a3e;
-  --secondary-foreground: #ffffff;
-  --muted: #f5e9da;
-  --muted-foreground: #6b7280;
-  --accent: #f39c6b;
-  --accent-foreground: #ffffff;
-  --destructive: #d26a6a;
-  --destructive-foreground: #ffffff;
-  --border: #f5e9da;
-  --input: rgba(255, 255, 255, 0.8);
-  --ring: #f39c6b;
-  --success: #6ea989;
-  --warning: #e2b566;
-  --chart-1: #f39c6b;
-  --chart-2: #c85a3e;
-  --chart-3: #6ea989;
-  --chart-4: #e2b566;
-  --chart-5: #d26a6a;
-  --radius: 1rem; /* rounded-2xl */
-  --sidebar: #fffbf6;
-  --sidebar-foreground: #1f2937;
-  --sidebar-primary: #f39c6b;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5e9da;
-  --sidebar-accent-foreground: #1f2937;
-  --sidebar-border: #f5e9da;
-  --sidebar-ring: #f39c6b;
-}
-
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
   /* Added custom warm color utilities */
   --color-apricot: #f39c6b;
   --color-apricot-600: #e7854b;
@@ -131,6 +49,54 @@
   --color-beige-300: #f5e9da;
   --color-beige-400: #f0dcc9;
 }
+
+.dark {
+  /* Dark mode with warm accent colors */
+  --background: #1a1a1a;
+  --foreground: #f5f5f5;
+  --card: #2a2a2a;
+  --card-foreground: #f5f5f5;
+  --popover: #2a2a2a;
+  --popover-foreground: #f5f5f5;
+  --primary: #f39c6b;
+  --primary-foreground: #ffffff;
+  --secondary: #c85a3e;
+  --secondary-foreground: #ffffff;
+  --muted: #3a3a3a;
+  --muted-foreground: #a0a0a0;
+  --accent: #f39c6b;
+  --accent-foreground: #ffffff;
+  --destructive: #d26a6a;
+  --destructive-foreground: #ffffff;
+  --border: #404040;
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #f39c6b;
+  --success: #6ea989;
+  --warning: #e2b566;
+  --chart-1: #f39c6b;
+  --chart-2: #c85a3e;
+  --chart-3: #6ea989;
+  --chart-4: #e2b566;
+  --chart-5: #d26a6a;
+  --radius: 1rem; /* rounded-2xl */
+  --sidebar: #2a2a2a;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #f39c6b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #3a3a3a;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #404040;
+  --sidebar-ring: #f39c6b;
+  /* Added custom warm color utilities */
+  --color-apricot: #f39c6b;
+  --color-apricot-600: #e7854b;
+  --color-rust: #c85a3e;
+  --color-sage: #6ea989;
+  --color-amber: #e2b566;
+  --color-beige-300: #f5e9da;
+  --color-beige-400: #f0dcc9;
+}
+
 
 @layer base {
   * {
@@ -169,29 +135,40 @@
   .shadow-ring {
     box-shadow: 0 0 0 2px rgba(243, 156, 107, 0.2);
   }
+
+  /* Custom color background utilities */
   .bg-apricot {
-    background-color: var(--color-apricot);
+    background-color: #f39c6b;
   }
   .bg-apricot-600 {
-    background-color: var(--color-apricot-600);
+    background-color: #e7854b;
   }
   .bg-sage {
-    background-color: var(--color-sage);
+    background-color: #6ea989;
   }
   .bg-amber {
-    background-color: var(--color-amber);
+    background-color: #e2b566;
   }
   .border-beige-300 {
-    border-color: var(--color-beige-300);
+    border-color: #f5e9da;
   }
   .border-beige-400 {
-    border-color: var(--color-beige-400);
+    border-color: #f0dcc9;
   }
   .border-sage {
-    border-color: var(--color-sage);
+    border-color: #6ea989;
   }
   .border-amber {
-    border-color: var(--color-amber);
+    border-color: #e2b566;
+  }
+  .text-apricot {
+    color: #f39c6b;
+  }
+  .text-sage {
+    color: #6ea989;
+  }
+  .text-amber {
+    color: #e2b566;
   }
 
   /* Added musical-themed utility classes */
@@ -205,15 +182,16 @@
     top: -8px;
     right: -8px;
     font-size: 12px;
-    color: var(--color-apricot);
+    color: #f39c6b;
     opacity: 0.6;
   }
 
   .treble-clef::before {
     content: "𝄞";
     font-size: 16px;
-    color: var(--color-sage);
+    color: #6ea989;
     opacity: 0.7;
     margin-right: 8px;
   }
+
 }
