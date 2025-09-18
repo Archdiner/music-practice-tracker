@@ -1,0 +1,219 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Updated to warm palette with cream background and apricot accents */
+  --background: #fef3e8; /* more orange cream */
+  --foreground: #1f2937; /* dark gray text */
+  --card: #fffbf6; /* light beige */
+  --card-foreground: #1f2937;
+  --popover: #fffbf6;
+  --popover-foreground: #1f2937;
+  --primary: #f39c6b; /* apricot */
+  --primary-foreground: #ffffff;
+  --secondary: #c85a3e; /* rust */
+  --secondary-foreground: #ffffff;
+  --muted: #f5e9da; /* beige-300 */
+  --muted-foreground: #6b7280;
+  --accent: #f39c6b; /* apricot */
+  --accent-foreground: #ffffff;
+  --destructive: #d26a6a; /* rose red */
+  --destructive-foreground: #ffffff;
+  --border: #f5e9da; /* beige-300 */
+  --input: rgba(255, 255, 255, 0.8); /* white/80 */
+  --ring: #f39c6b; /* apricot */
+  --success: #6ea989; /* sage green */
+  --warning: #e2b566; /* warm amber */
+  --chart-1: #f39c6b; /* apricot */
+  --chart-2: #c85a3e; /* rust */
+  --chart-3: #6ea989; /* sage green */
+  --chart-4: #e2b566; /* warm amber */
+  --chart-5: #d26a6a; /* rose red */
+  --radius: 1rem; /* rounded-2xl */
+  --sidebar: #fffbf6;
+  --sidebar-foreground: #1f2937;
+  --sidebar-primary: #f39c6b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f5e9da;
+  --sidebar-accent-foreground: #1f2937;
+  --sidebar-border: #f5e9da;
+  --sidebar-ring: #f39c6b;
+}
+
+.dark {
+  /* Keep same warm palette for dark mode consistency */
+  --background: #fff8f1;
+  --foreground: #1f2937;
+  --card: #fffbf6;
+  --card-foreground: #1f2937;
+  --popover: #fffbf6;
+  --popover-foreground: #1f2937;
+  --primary: #f39c6b;
+  --primary-foreground: #ffffff;
+  --secondary: #c85a3e;
+  --secondary-foreground: #ffffff;
+  --muted: #f5e9da;
+  --muted-foreground: #6b7280;
+  --accent: #f39c6b;
+  --accent-foreground: #ffffff;
+  --destructive: #d26a6a;
+  --destructive-foreground: #ffffff;
+  --border: #f5e9da;
+  --input: rgba(255, 255, 255, 0.8);
+  --ring: #f39c6b;
+  --success: #6ea989;
+  --warning: #e2b566;
+  --chart-1: #f39c6b;
+  --chart-2: #c85a3e;
+  --chart-3: #6ea989;
+  --chart-4: #e2b566;
+  --chart-5: #d26a6a;
+  --radius: 1rem; /* rounded-2xl */
+  --sidebar: #fffbf6;
+  --sidebar-foreground: #1f2937;
+  --sidebar-primary: #f39c6b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f5e9da;
+  --sidebar-accent-foreground: #1f2937;
+  --sidebar-border: #f5e9da;
+  --sidebar-ring: #f39c6b;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Added custom warm color utilities */
+  --color-apricot: #f39c6b;
+  --color-apricot-600: #e7854b;
+  --color-rust: #c85a3e;
+  --color-sage: #6ea989;
+  --color-amber: #e2b566;
+  --color-beige-300: #f5e9da;
+  --color-beige-400: #f0dcc9;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Added subtle musical note pattern background */
+    background-image: radial-gradient(circle at 20% 80%, rgba(243, 156, 107, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(195, 90, 62, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(110, 169, 137, 0.02) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Added musical note decorative elements */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f39c6b' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4a4 4 0 1 0 2 0zm0-6V14h8v2h-6v12h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-size: 120px 120px;
+    opacity: 0.4;
+  }
+}
+
+/* Added custom utility classes for warm palette */
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(195, 90, 62, 0.08);
+  }
+  .shadow-ring {
+    box-shadow: 0 0 0 2px rgba(243, 156, 107, 0.2);
+  }
+  .bg-apricot {
+    background-color: var(--color-apricot);
+  }
+  .bg-apricot-600 {
+    background-color: var(--color-apricot-600);
+  }
+  .bg-sage {
+    background-color: var(--color-sage);
+  }
+  .bg-amber {
+    background-color: var(--color-amber);
+  }
+  .border-beige-300 {
+    border-color: var(--color-beige-300);
+  }
+  .border-beige-400 {
+    border-color: var(--color-beige-400);
+  }
+  .border-sage {
+    border-color: var(--color-sage);
+  }
+  .border-amber {
+    border-color: var(--color-amber);
+  }
+
+  /* Added musical-themed utility classes */
+  .musical-accent {
+    position: relative;
+  }
+
+  .musical-accent::before {
+    content: "♪";
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 12px;
+    color: var(--color-apricot);
+    opacity: 0.6;
+  }
+
+  .treble-clef::before {
+    content: "𝄞";
+    font-size: 16px;
+    color: var(--color-sage);
+    opacity: 0.7;
+    margin-right: 8px;
+  }
+}
