@@ -43,19 +43,33 @@ const config: Config = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			}
+			chart: {
+				'1': 'hsl(var(--chart-1))',
+				'2': 'hsl(var(--chart-2))',
+				'3': 'hsl(var(--chart-3))',
+				'4': 'hsl(var(--chart-4))',
+				'5': 'hsl(var(--chart-5))'
+			},
+			// Custom warm palette colors
+			apricot: {
+				DEFAULT: '#f39c6b',
+				600: '#e7854b'
+			},
+			rust: '#c85a3e',
+			sage: '#6ea989',
+			amber: '#e2b566',
+			'beige-300': '#f5e9da',
+			'beige-400': '#f0dcc9'
   		},
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		}
+		borderRadius: {
+			lg: 'var(--radius)',
+			md: 'calc(var(--radius) - 2px)',
+			sm: 'calc(var(--radius) - 4px)'
+		},
+		// Add custom grid columns for heatmap
+		gridTemplateColumns: {
+			'53': 'repeat(53, minmax(0, 1fr))'
+		}
   	}
   },
   plugins: [require("tailwindcss-animate")],
