@@ -1,8 +1,9 @@
+"use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, Timer, Award } from "lucide-react"
 
-export function WeeklyInsights() {
+export function WeeklyInsights({ onGenerated }: { onGenerated?: () => void }) {
   return (
     <Card className="rounded-2xl bg-card border border-beige-300 shadow-soft">
       <CardHeader>
@@ -41,7 +42,7 @@ export function WeeklyInsights() {
           </div>
         </div>
 
-        <Button className="w-full bg-apricot text-white hover:bg-apricot-600 shadow-soft">
+        <Button className="w-full bg-apricot text-white hover:bg-apricot-600 shadow-soft" onClick={() => onGenerated?.()}>
           Generate Practice Insights
         </Button>
       </CardContent>
