@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Music4, Plus } from "lucide-react"
+import { Music4, Plus, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function TodayCard({ onSaved }: { onSaved?: () => void }) {
@@ -11,26 +11,47 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
   const [err, setErr] = useState<string | null>(null)
   const [todayEntries, setTodayEntries] = useState<any[]>([])
   const [loadingEntries, setLoadingEntries] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadTodayEntries = async () => {
     try {
-      const res = await fetch("/api/log", {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/entries?date=${today}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       });
       
       if (res.ok) {
         const data = await res.json();
-        const today = new Date().toISOString().split('T')[0];
-        const todayOnly = (data.entries || []).filter((entry: any) => 
-          entry.logged_at === today
-        );
-        setTodayEntries(todayOnly);
+        setTodayEntries(data.entries || []);
       }
     } catch (error) {
       console.error("Failed to load today's entries:", error);
     } finally {
       setLoadingEntries(false);
+    }
+  };
+
+  const deleteActivity = async (entryId: string, activityIndex: number) => {
+    setDeletingId(`${entryId}-${activityIndex}`);
+    try {
+      const res = await fetch(`/api/entries/${entryId}?activityIndex=${activityIndex}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (res.ok) {
+        await loadTodayEntries(); // Reload entries after deletion
+        onSaved?.(); // Trigger refresh of other components
+      } else {
+        const errorData = await res.json();
+        setErr(errorData.error || "Failed to delete activity");
+      }
+    } catch (error) {
+      console.error("Failed to delete activity:", error);
+      setErr("Network error deleting activity");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -42,26 +63,21 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
     setErr(null)
     if (!rawText.trim()) return;
     setIsSaving(true)
-    console.log("Saving practice data:", rawText);
     try {
       const res = await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawText })
       })
-      console.log("API response status:", res.status);
       if (res.status === 401) {
         if (typeof window !== "undefined") window.location.href = "/login";
         return;
       }
       if (!res.ok) {
         const j = await res.json().catch(() => ({} as { error?: string }));
-        console.error("API error response:", j);
         setErr((j as { error?: string })?.error ?? "Failed to save");
         return;
       }
-      const result = await res.json();
-      console.log("API success response:", result);
       setNotes("")
       // Reload today's entries after successful save
       await loadTodayEntries();
@@ -109,27 +125,38 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
             ) : todayEntries.length === 0 ? (
               <div className="text-sm text-muted-foreground">No practice sessions logged today</div>
             ) : (
-              todayEntries.map((entry, index) => (
-                <div key={index} className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="w-2 h-2 bg-apricot rounded-full"></div>
-                    <span className="text-foreground font-medium">{entry.total_minutes} minutes total</span>
-                  </div>
-                  {entry.activities && entry.activities.map((activity: any, actIndex: number) => (
-                    <div key={actIndex} className="flex items-center gap-2 text-sm ml-4">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
+              todayEntries.flatMap((entry) => 
+                entry.activities?.map((activity: any, actIndex: number) => (
+                  <div key={`${entry.id}-${actIndex}`} className="flex items-center justify-between p-2 border border-beige-300/50 rounded-lg bg-card/50">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className={`w-2 h-2 rounded-full ${
                         activity.category === 'Technique' ? 'bg-sage' :
                         activity.category === 'Repertoire' ? 'bg-amber' :
                         activity.category === 'Theory' ? 'bg-blue-400' :
+                        activity.category === 'Ear' ? 'bg-purple-400' :
+                        activity.category === 'Improvisation' ? 'bg-green-400' :
+                        activity.category === 'Recording' ? 'bg-red-400' :
                         'bg-gray-400'
                       }`}></div>
-                      <span className="text-muted-foreground text-xs">
-                        {activity.sub} - {activity.minutes}min ({activity.category})
+                      <span className="text-foreground">
+                        {activity.sub} - {activity.minutes}min
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({activity.category})
                       </span>
                     </div>
-                  ))}
-                </div>
-              ))
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => deleteActivity(entry.id, actIndex)}
+                      disabled={deletingId === `${entry.id}-${actIndex}`}
+                      className="h-6 w-6 p-0 border-red-300 hover:bg-red-50 hover:border-red-400"
+                    >
+                      <Trash2 className="h-3 w-3 text-red-500" />
+                    </Button>
+                  </div>
+                )) || []
+              )
             )}
           </div>
         </div>

@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       .from("practice_logs")
       .select("*")
       .eq("user_id", user.id)
-      .order("logged_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (date) {
       // Get entries for specific date

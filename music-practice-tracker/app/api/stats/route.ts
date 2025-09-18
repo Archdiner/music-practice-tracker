@@ -7,28 +7,20 @@ import { supaServer } from "@/lib/supabaseServer";
 
 export async function GET() {
   try {
-    console.log("[api/stats] GET request received");
     const sb = supaServer();
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-    console.log("[api/stats] User ID:", user.id);
-
     const { data: prof } = await sb.from("profiles").select("daily_target").eq("id", user.id).maybeSingle();
     const target = prof?.daily_target ?? 20;
-    console.log("[api/stats] Target:", target, "Profile data:", prof);
 
     const since = new Date(Date.now()-60*24*3600e3).toISOString().slice(0,10);
-    console.log("[api/stats] Querying since:", since);
-    
-    const { data: rows, error: queryError } = await sb
+    const { data: rows } = await sb
       .from("practice_logs")
       .select("logged_at,total_minutes,activities")
       .eq("user_id", user.id)
       .gte("logged_at", since);
-    
-    console.log("[api/stats] Database query result:", { rows, error: queryError, rowCount: rows?.length });
 
     // Properly aggregate multiple entries per day
     const byDate = new Map<string, number>();
@@ -55,9 +47,7 @@ export async function GET() {
     const todayKey = new Date().toISOString().slice(0,10);
     const todayMinutes = byDate.get(todayKey) ?? 0;
 
-    const result = { target, streakDays: streak, weekTotal, todayMinutes, categoryBreakdown };
-    console.log("[api/stats] Final result:", result);
-    return NextResponse.json(result);
+    return NextResponse.json({ target, streakDays: streak, weekTotal, todayMinutes, categoryBreakdown });
   } catch (e) {
     console.error("[api/stats] GET failed", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
