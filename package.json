@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@supabase/auth-ui-react": "^0.4.7",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "react-calendar-heatmap": "^1.10.0",
+    "zod": "^4.1.9"
+  }
+}
