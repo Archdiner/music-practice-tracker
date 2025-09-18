@@ -5,11 +5,11 @@
 
 :root {
   /* Updated to warm palette with cream background and apricot accents */
-  --background: #fef3e8; /* more orange cream */
+  --background: #f7f3ed; /* warm neutral cream */
   --foreground: #1f2937; /* dark gray text */
-  --card: #fffbf6; /* light beige */
+  --card: #fefcf8; /* slightly warmer white */
   --card-foreground: #1f2937;
-  --popover: #fffbf6;
+  --popover: #fefcf8;
   --popover-foreground: #1f2937;
   --primary: #f39c6b; /* apricot */
   --primary-foreground: #ffffff;

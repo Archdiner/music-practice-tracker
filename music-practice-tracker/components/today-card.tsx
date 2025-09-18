@@ -3,33 +3,68 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Music4, Plus } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export function TodayCard({ onSaved }: { onSaved?: () => void }) {
   const [notes, setNotes] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [todayEntries, setTodayEntries] = useState<any[]>([])
+  const [loadingEntries, setLoadingEntries] = useState(true)
+
+  const loadTodayEntries = async () => {
+    try {
+      const res = await fetch("/api/log", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const today = new Date().toISOString().split('T')[0];
+        const todayOnly = (data.entries || []).filter((entry: any) => 
+          entry.logged_at === today
+        );
+        setTodayEntries(todayOnly);
+      }
+    } catch (error) {
+      console.error("Failed to load today's entries:", error);
+    } finally {
+      setLoadingEntries(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTodayEntries();
+  }, []);
 
   async function save(rawText: string) {
     setErr(null)
     if (!rawText.trim()) return;
     setIsSaving(true)
+    console.log("Saving practice data:", rawText);
     try {
       const res = await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawText })
       })
+      console.log("API response status:", res.status);
       if (res.status === 401) {
         if (typeof window !== "undefined") window.location.href = "/login";
         return;
       }
       if (!res.ok) {
         const j = await res.json().catch(() => ({} as { error?: string }));
+        console.error("API error response:", j);
         setErr((j as { error?: string })?.error ?? "Failed to save");
         return;
       }
+      const result = await res.json();
+      console.log("API success response:", result);
       setNotes("")
+      // Reload today's entries after successful save
+      await loadTodayEntries();
       onSaved?.()
     } catch {
       setErr("Network error")
@@ -69,18 +104,33 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
         <div className="pt-2 border-t border-beige-300">
           <p className="text-xs text-muted-foreground mb-2">Today&apos;s Practice Sessions</p>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-2 h-2 bg-apricot rounded-full"></div>
-              <span className="text-foreground">Scales & arpeggios - 20 min</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-2 h-2 bg-sage rounded-full"></div>
-              <span className="text-foreground">Bach Invention No. 1</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="w-2 h-2 bg-amber rounded-full"></div>
-              <span className="text-foreground">Chopin Nocturne practice</span>
-            </div>
+            {loadingEntries ? (
+              <div className="text-sm text-muted-foreground">Loading...</div>
+            ) : todayEntries.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No practice sessions logged today</div>
+            ) : (
+              todayEntries.map((entry, index) => (
+                <div key={index} className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="w-2 h-2 bg-apricot rounded-full"></div>
+                    <span className="text-foreground font-medium">{entry.total_minutes} minutes total</span>
+                  </div>
+                  {entry.activities && entry.activities.map((activity: any, actIndex: number) => (
+                    <div key={actIndex} className="flex items-center gap-2 text-sm ml-4">
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        activity.category === 'Technique' ? 'bg-sage' :
+                        activity.category === 'Repertoire' ? 'bg-amber' :
+                        activity.category === 'Theory' ? 'bg-blue-400' :
+                        'bg-gray-400'
+                      }`}></div>
+                      <span className="text-muted-foreground text-xs">
+                        {activity.sub} - {activity.minutes}min ({activity.category})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </CardContent>
