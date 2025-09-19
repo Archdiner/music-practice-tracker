@@ -15,12 +15,11 @@ export async function GET() {
     const { data: prof } = await sb.from("profiles").select("daily_target").eq("id", user.id).maybeSingle();
     const target = prof?.daily_target ?? 20;
 
-    const since = new Date(Date.now()-60*24*3600e3).toISOString().slice(0,10);
+    // Get ALL practice data (no time limit for streak calculation)
     const { data: rows } = await sb
       .from("practice_logs")
       .select("logged_at,total_minutes,activities")
-      .eq("user_id", user.id)
-      .gte("logged_at", since);
+      .eq("user_id", user.id);
 
     // Properly aggregate multiple entries per day
     const byDate = new Map<string, number>();
@@ -29,14 +28,35 @@ export async function GET() {
       byDate.set(r.logged_at, existing + r.total_minutes);
     });
 
-    const d = new Date(); let streak = 0;
-    for (;;) {
-      const key = d.toISOString().slice(0,10);
-      const mins = byDate.get(key) ?? 0;
-      if (mins >= target) { streak++; d.setDate(d.getDate()-1); } else break;
-    }
-
+    // Calculate consecutive days with ANY practice data (not just target met)
     const today = new Date();
+    let streak = 0;
+    let currentDate = new Date(today);
+    
+    console.log(`[api/stats] Calculating streak from today: ${today.toISOString().slice(0,10)}`);
+    console.log(`[api/stats] Available practice dates:`, Array.from(byDate.keys()).sort());
+    
+    // Start from today and work backwards
+    for (let i = 0; i < 365; i++) { // Safety limit to prevent infinite loops
+      const key = currentDate.toISOString().slice(0,10);
+      const mins = byDate.get(key) ?? 0;
+      
+      console.log(`[api/stats] Checking date ${key}: ${mins} minutes`);
+      
+      // If there's any practice data for this day, continue the streak
+      if (mins > 0) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        // No practice data for this day, streak ends
+        console.log(`[api/stats] No practice data for ${key}, streak ends at ${streak} days`);
+        break;
+      }
+    }
+    
+    console.log(`[api/stats] Final streak: ${streak} days`);
+
+    // Calculate week stats
     const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay()+6)%7));
     const weekKey = monday.toISOString().slice(0,10);
     const weekLogs = (rows ?? []).filter(r => r.logged_at >= weekKey);
