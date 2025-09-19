@@ -49,7 +49,7 @@ CATEGORIES (use exactly these):
 
 RULES:
 1. Extract time durations from text (30min, 1 hour, half hour, etc.)
-2. If no time specified, estimate reasonable duration (10-30 minutes)
+2. If no time specified, estimate reasonable duration in minutes
 3. Create clear, standardized descriptions for "sub" field
 4. Total minutes should not exceed 240 (4 hours)
 5. Each activity should be 1-240 minutes
@@ -128,6 +128,122 @@ Examples of good "sub" descriptions:
       throw new Error(`AI parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  async generateWeeklyInsights(weekData: WeeklyData): Promise<WeeklyInsights> {
+    const prompt = `You are a music practice coach AI. Generate personalized weekly insights based on practice data.
+
+WEEK SUMMARY:
+- Total practice time: ${weekData.totalMinutes} minutes (${Math.round(weekData.totalMinutes/60*10)/10} hours)
+- Days practiced: ${weekData.daysPracticed}/7
+- Days hit daily goal (${weekData.dailyTarget}min): ${weekData.daysHitGoal}/7
+- Previous week: ${weekData.previousWeekMinutes || 'N/A'} minutes
+
+CATEGORY BREAKDOWN:
+${Object.entries(weekData.categoryMinutes).map(([cat, mins]) => 
+  `- ${cat}: ${mins} minutes (${Math.round(mins/weekData.totalMinutes*100)}%)`
+).join('\n')}
+
+PRACTICE ACTIVITIES:
+${weekData.activities.slice(0, 10).map(act => `- ${act.sub} (${act.minutes}min)`).join('\n')}
+
+Generate insights in this JSON format:
+{
+  "summary": "2-3 sentence overview of the week's practice",
+  "insights": [
+    {
+      "type": "progress|achievement|concern|recommendation",
+      "title": "Short title (max 25 chars)",
+      "content": "Detailed insight (max 120 chars)",
+      "icon": "trending-up|award|alert-circle|target"
+    }
+  ],
+  "recommendations": [
+    "Specific actionable recommendation 1",
+    "Specific actionable recommendation 2"
+  ]
+}
+
+GUIDELINES:
+1. Be encouraging and constructive
+2. Highlight both achievements and areas for improvement
+3. Make recommendations specific and actionable
+4. Use musician-friendly language
+5. Compare to previous week if data available
+6. Focus on balance across categories
+7. Celebrate consistency and progress
+8. Maximum 4 insights, 3 recommendations`;
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system", 
+            content: "You are an expert music practice coach. Generate helpful, encouraging insights in valid JSON format only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.3, // Slightly creative but consistent
+        max_tokens: 800,
+      });
+
+      const content = completion.choices[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error('No response from OpenAI');
+      }
+
+      // Parse and validate JSON response
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(content);
+      } catch (jsonError) {
+        console.error('JSON parse error:', jsonError);
+        throw new Error('Invalid JSON response from AI');
+      }
+
+      // Basic validation
+      if (!parsedResult.summary || !Array.isArray(parsedResult.insights)) {
+        throw new Error('Invalid insights structure from AI');
+      }
+
+      return parsedResult as WeeklyInsights;
+
+    } catch (error) {
+      console.error('AI insights generation error:', error);
+      throw new Error(`AI insights generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+}
+
+// Types for weekly insights
+export interface WeeklyData {
+  totalMinutes: number;
+  daysPracticed: number;
+  daysHitGoal: number;
+  dailyTarget: number;
+  previousWeekMinutes?: number;
+  categoryMinutes: Record<string, number>;
+  activities: Array<{
+    category: string;
+    sub: string;
+    minutes: number;
+  }>;
+}
+
+export interface WeeklyInsight {
+  type: 'progress' | 'achievement' | 'concern' | 'recommendation';
+  title: string;
+  content: string;
+  icon: 'trending-up' | 'award' | 'alert-circle' | 'target';
+}
+
+export interface WeeklyInsights {
+  summary: string;
+  insights: WeeklyInsight[];
+  recommendations: string[];
 }
 
 // Singleton instance
