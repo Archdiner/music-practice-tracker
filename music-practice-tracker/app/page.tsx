@@ -4,6 +4,7 @@ import { StatsBar } from "@/components/stats-bar";
 import { CalendarHeatmap } from "@/components/calendar-heatmap";
 import { WeeklyInsights } from "@/components/weekly-insights";
 import { TodayCard } from "@/components/today-card";
+import { GoalSetting } from "@/components/goal-setting";
 import { supaBrowser } from "@/lib/supabaseBrowser";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
@@ -79,6 +80,9 @@ export default function Dashboard() {
 
         {/* Top Stats Bar */}
         <StatsBar refreshTick={refreshTick} />
+
+        {/* Goal Setting Section */}
+        <GoalSetting onGoalChange={bump} />
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
