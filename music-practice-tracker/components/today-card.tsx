@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Music4, Plus, Trash2, CheckSquare, Square } from "lucide-react"
+import { Music4, Plus, Trash2, CheckSquare, Square, X, Edit2, Check } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function TodayCard({ 
@@ -20,12 +20,14 @@ export function TodayCard({
   const [todayEntries, setTodayEntries] = useState<any[]>([])
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [practiceGoals, setPracticeGoals] = useState<{id: string, text: string, completed: boolean}[]>([
-    { id: '1', text: 'Scales & Technique', completed: false },
-    { id: '2', text: 'Repertoire Practice', completed: false },
-    { id: '3', text: 'Ear Training', completed: false },
-    { id: '4', text: 'Theory Study', completed: false }
-  ])
+  
+  // Practice Goals State
+  const [practiceGoals, setPracticeGoals] = useState<{id: string, text: string, completed: boolean}[]>([])
+  const [loadingGoals, setLoadingGoals] = useState(true)
+  const [isAddingGoal, setIsAddingGoal] = useState(false)
+  const [newGoalText, setNewGoalText] = useState("")
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
+  const [editingGoalText, setEditingGoalText] = useState("")
 
   const loadTodayEntries = async () => {
     try {
@@ -69,19 +71,115 @@ export function TodayCard({
     }
   };
 
+  const loadPracticeGoals = async () => {
+    try {
+      setLoadingGoals(true);
+      const res = await fetch("/api/practice-goals", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPracticeGoals(data.goals || []);
+      }
+    } catch (error) {
+      console.error("Failed to load practice goals:", error);
+    } finally {
+      setLoadingGoals(false);
+    }
+  };
+
+  const addGoal = async () => {
+    if (!newGoalText.trim()) return;
+    
+    try {
+      const res = await fetch("/api/practice-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newGoalText.trim() })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPracticeGoals(goals => [...goals, data.goal]);
+        setNewGoalText("");
+        setIsAddingGoal(false);
+      }
+    } catch (error) {
+      console.error("Failed to add goal:", error);
+    }
+  };
+
+  const updateGoal = async (goalId: string, updates: { text?: string; completed?: boolean }) => {
+    try {
+      const res = await fetch(`/api/practice-goals/${goalId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates)
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPracticeGoals(goals => 
+          goals.map(goal => 
+            goal.id === goalId ? data.goal : goal
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to update goal:", error);
+    }
+  };
+
+  const deleteGoal = async (goalId: string) => {
+    try {
+      const res = await fetch(`/api/practice-goals/${goalId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (res.ok) {
+        setPracticeGoals(goals => goals.filter(goal => goal.id !== goalId));
+      }
+    } catch (error) {
+      console.error("Failed to delete goal:", error);
+    }
+  };
+
   const toggleGoal = (goalId: string) => {
-    setPracticeGoals(goals => 
-      goals.map(goal => 
-        goal.id === goalId 
-          ? { ...goal, completed: !goal.completed }
-          : goal
-      )
-    );
+    const goal = practiceGoals.find(g => g.id === goalId);
+    if (goal) {
+      updateGoal(goalId, { completed: !goal.completed });
+    }
+  };
+
+  const startEditingGoal = (goalId: string, currentText: string) => {
+    setEditingGoalId(goalId);
+    setEditingGoalText(currentText);
+  };
+
+  const saveGoalEdit = async () => {
+    if (!editingGoalId || !editingGoalText.trim()) return;
+    
+    await updateGoal(editingGoalId, { text: editingGoalText.trim() });
+    setEditingGoalId(null);
+    setEditingGoalText("");
+  };
+
+  const cancelGoalEdit = () => {
+    setEditingGoalId(null);
+    setEditingGoalText("");
   };
 
   useEffect(() => {
     loadTodayEntries();
   }, [selectedDate]);
+
+  useEffect(() => {
+    // Only load goals once on component mount, not when selectedDate changes
+    loadPracticeGoals();
+  }, []);
 
   async function save(rawText: string) {
     setErr(null)
@@ -166,27 +264,145 @@ export function TodayCard({
 
         {/* Practice Goals */}
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Today&apos;s Practice Goals</p>
-          <div className="space-y-2">
-            {practiceGoals.map((goal) => (
-              <div 
-                key={goal.id}
-                className="flex items-center gap-2 p-2 border border-beige-300/50 rounded-lg bg-card/50 hover:bg-card/70 transition-colors cursor-pointer"
-                onClick={() => toggleGoal(goal.id)}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {selectedDate ? 'Today\'s Practice Goals' : 'Today\'s Practice Goals'}
+            </p>
+            {!selectedDate && !isAddingGoal && practiceGoals.length < 5 && (
+              <Button
+                size="sm"
+                onClick={() => setIsAddingGoal(true)}
+                className="h-6 px-2 text-xs bg-sage/10 hover:bg-sage/20 text-sage border border-sage/20"
               >
-                <div className="flex-shrink-0">
-                  {goal.completed ? (
-                    <CheckSquare className="h-4 w-4 text-sage" />
+                + Add Goal
+              </Button>
+            )}
+          </div>
+          
+          {loadingGoals ? (
+            <div className="text-sm text-muted-foreground">Loading goals...</div>
+          ) : (
+            <div className="space-y-2">
+              {practiceGoals.map((goal) => (
+                <div 
+                  key={goal.id}
+                  className="flex items-center gap-2 p-2 border border-beige-300/50 rounded-lg bg-card/50 hover:bg-card/70 transition-colors group"
+                >
+                  <div 
+                    className="flex-shrink-0 cursor-pointer"
+                    onClick={() => toggleGoal(goal.id)}
+                  >
+                    {goal.completed ? (
+                      <CheckSquare className="h-4 w-4 text-sage" />
+                    ) : (
+                      <Square className="h-4 w-4 text-muted-foreground hover:text-sage transition-colors" />
+                    )}
+                  </div>
+                  
+                  {editingGoalId === goal.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingGoalText}
+                        onChange={(e) => setEditingGoalText(e.target.value)}
+                        className="text-sm bg-transparent border-b border-sage focus:outline-none flex-1"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveGoalEdit();
+                          if (e.key === 'Escape') cancelGoalEdit();
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={saveGoalEdit}
+                        className="h-5 w-5 p-0 bg-sage hover:bg-sage-600"
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={cancelGoalEdit}
+                        className="h-5 w-5 p-0 bg-gray-400 hover:bg-gray-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   ) : (
-                    <Square className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span 
+                        className={`text-sm flex-1 ${!selectedDate ? 'cursor-pointer' : ''} ${goal.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}
+                        onClick={() => !selectedDate && startEditingGoal(goal.id, goal.text)}
+                      >
+                        {goal.text}
+                      </span>
+                      {!selectedDate && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="sm"
+                            onClick={() => startEditingGoal(goal.id, goal.text)}
+                            className="h-5 w-5 p-0 bg-transparent hover:bg-sage/10 border border-sage/20 hover:border-sage"
+                          >
+                            <Edit2 className="h-3 w-3 text-sage" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => deleteGoal(goal.id)}
+                            className="h-5 w-5 p-0 bg-transparent hover:bg-red-50 border border-red-300/20 hover:border-red-400"
+                          >
+                            <X className="h-3 w-3 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                <span className={`text-sm ${goal.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                  {goal.text}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+              
+              {isAddingGoal && (
+                <div className="flex items-center gap-2 p-2 border border-sage/50 rounded-lg bg-sage/5">
+                  <Square className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={newGoalText}
+                    onChange={(e) => setNewGoalText(e.target.value)}
+                    placeholder="Enter practice goal..."
+                    className="text-sm bg-transparent border-b border-sage focus:outline-none flex-1"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addGoal();
+                      if (e.key === 'Escape') {
+                        setIsAddingGoal(false);
+                        setNewGoalText("");
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={addGoal}
+                    className="h-5 w-5 p-0 bg-sage hover:bg-sage-600"
+                  >
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setIsAddingGoal(false);
+                      setNewGoalText("");
+                    }}
+                    className="h-5 w-5 p-0 bg-gray-400 hover:bg-gray-500"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              
+              {practiceGoals.length === 0 && !isAddingGoal && (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  No practice goals yet. Click "Add Goal" to get started!
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pt-2 border-t border-beige-300">

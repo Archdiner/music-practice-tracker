@@ -94,7 +94,6 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 // DELETE: Delete a specific activity from a day's entry
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
-    console.log("[api/entries/delete] DELETE request for entry:", params.id);
     const sb = supaServer();
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
@@ -102,7 +101,6 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     const url = new URL(req.url);
     const activityIndex = url.searchParams.get("activityIndex");
-    console.log("[api/entries/delete] Activity index:", activityIndex);
     
     if (activityIndex === null) {
       return NextResponse.json({ error: "activityIndex parameter required" }, { status: 400 });
@@ -121,28 +119,21 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       .eq("user_id", user.id)
       .single();
 
-    console.log("[api/entries/delete] Current entry:", { currentEntry, fetchError });
-
     if (fetchError || !currentEntry) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
 
     // Remove the specific activity
     const activities = [...(currentEntry.activities || [])];
-    console.log("[api/entries/delete] Current activities:", activities);
-    console.log("[api/entries/delete] Deleting activity at index:", actIndex);
     
     if (actIndex >= activities.length) {
       return NextResponse.json({ error: "Activity index out of range" }, { status: 400 });
     }
 
     const deletedActivity = activities.splice(actIndex, 1)[0];
-    console.log("[api/entries/delete] Deleted activity:", deletedActivity);
-    console.log("[api/entries/delete] Remaining activities:", activities);
     
     // Recalculate total minutes
     const newTotalMinutes = activities.reduce((sum, act) => sum + (act.minutes || 0), 0);
-    console.log("[api/entries/delete] New total minutes:", newTotalMinutes);
 
     // If no activities left, delete the entire row
     if (activities.length === 0) {

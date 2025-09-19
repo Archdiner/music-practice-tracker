@@ -33,15 +33,10 @@ export async function GET() {
     let streak = 0;
     let currentDate = new Date(today);
     
-    console.log(`[api/stats] Calculating streak from today: ${today.toISOString().slice(0,10)}`);
-    console.log(`[api/stats] Available practice dates:`, Array.from(byDate.keys()).sort());
-    
     // Start from today and work backwards
     for (let i = 0; i < 365; i++) { // Safety limit to prevent infinite loops
       const key = currentDate.toISOString().slice(0,10);
       const mins = byDate.get(key) ?? 0;
-      
-      console.log(`[api/stats] Checking date ${key}: ${mins} minutes`);
       
       // If there's any practice data for this day, continue the streak
       if (mins > 0) {
@@ -49,12 +44,9 @@ export async function GET() {
         currentDate.setDate(currentDate.getDate() - 1);
       } else {
         // No practice data for this day, streak ends
-        console.log(`[api/stats] No practice data for ${key}, streak ends at ${streak} days`);
         break;
       }
     }
-    
-    console.log(`[api/stats] Final streak: ${streak} days`);
 
     // Calculate week stats
     const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay()+6)%7));

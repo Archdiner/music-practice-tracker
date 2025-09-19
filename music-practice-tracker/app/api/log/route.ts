@@ -39,11 +39,6 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
     const parsed = parseHeuristic(body.rawText);
-    
-    console.log(`[api/log] Saving practice data for user ${user.id}`);
-    console.log(`[api/log] Date: ${body.date ?? 'null (today)'}`);
-    console.log(`[api/log] Raw text: ${body.rawText}`);
-    console.log(`[api/log] Parsed: ${JSON.stringify(parsed)}`);
 
     const { data, error } = await sb.rpc("log_practice", {
       p_user_id: user.id,
@@ -58,7 +53,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
-    console.log(`[api/log] Successfully saved practice data: ${JSON.stringify(data)}`);
     return NextResponse.json({ ok: true, log: data });
   } catch (e) {
     console.error("[api/log] POST failed", e);
