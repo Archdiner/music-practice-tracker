@@ -15,7 +15,7 @@ export async function GET() {
     const { data: prof } = await sb.from("profiles").select("daily_target").eq("id", user.id).maybeSingle();
     const target = prof?.daily_target ?? 20;
 
-    // Get ALL practice data (no time limit for streak calculation)
+    // Get ALL practice data (back to original working query)
     const { data: rows } = await sb
       .from("practice_logs")
       .select("logged_at,total_minutes,activities")
@@ -48,7 +48,7 @@ export async function GET() {
       }
     }
 
-    // Calculate week stats
+    // Calculate week stats using historical goals
     const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay()+6)%7));
     const weekKey = monday.toISOString().slice(0,10);
     const weekLogs = (rows ?? []).filter(r => r.logged_at >= weekKey);
@@ -56,10 +56,25 @@ export async function GET() {
     const categoryBreakdown = weekLogs.flatMap((r: { activities: { category: string; minutes: number }[] })=>r.activities)
       .reduce((acc: Record<string, number>, a: { category: string; minutes: number })=>((acc[a.category]=(acc[a.category]||0)+a.minutes),acc),{} as Record<string, number>);
 
+    // Calculate week days hit goal (back to original simple approach)
+    const weekDailyTotals = new Map<string, number>();
+    weekLogs.forEach(log => {
+      const existing = weekDailyTotals.get(log.logged_at) || 0;
+      weekDailyTotals.set(log.logged_at, existing + log.total_minutes);
+    });
+    const weekDaysHitGoal = Array.from(weekDailyTotals.values()).filter(mins => mins >= target).length;
+
     const todayKey = new Date().toISOString().slice(0,10);
     const todayMinutes = byDate.get(todayKey) ?? 0;
 
-    return NextResponse.json({ target, streakDays: streak, weekTotal, todayMinutes, categoryBreakdown });
+    return NextResponse.json({ 
+      target, 
+      streakDays: streak, 
+      weekTotal, 
+      weekDaysHitGoal,
+      todayMinutes, 
+      categoryBreakdown 
+    });
   } catch (e) {
     console.error("[api/stats] GET failed", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });

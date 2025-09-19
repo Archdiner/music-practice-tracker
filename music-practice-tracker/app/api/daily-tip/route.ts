@@ -2,16 +2,47 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
 import { getAIService, OverarchingGoal } from "@/lib/aiService";
 
-// GET: Generate daily tip based on user's goal and recent practice
-export async function GET() {
+const RegenerateTipBody = z.object({
+  forceRegenerate: z.boolean().optional().default(false)
+});
+
+// GET: Get cached daily tip or generate new one if needed
+export async function GET(req: Request) {
   try {
     const sb = supaServer();
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+    const url = new URL(req.url);
+    const forceRegenerate = url.searchParams.get("forceRegenerate") === "true";
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check if we have a cached tip in user profile (unless forcing regeneration)
+    if (!forceRegenerate) {
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("last_tip_date, last_tip_text, last_tip_goal_title")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.last_tip_date === today && profile?.last_tip_text) {
+        console.log("[api/daily-tip] Returning cached tip from profile");
+        return NextResponse.json({
+          tip: profile.last_tip_text,
+          cached: true,
+          goal_title: profile.last_tip_goal_title,
+          generated_at: profile.last_tip_date
+        });
+      }
+    }
+
+    // No cached tip, need to generate new one
+    console.log("[api/daily-tip] No cached tip found, generating new one");
 
     // Get user's current overarching goal
     const { data: overarchingGoal } = await sb
@@ -24,6 +55,7 @@ export async function GET() {
     if (!overarchingGoal) {
       return NextResponse.json({ 
         tip: null,
+        cached: false,
         message: "No active goal set. Set a goal to get personalized daily tips!"
       });
     }
@@ -45,7 +77,7 @@ export async function GET() {
     let dailyTip = null;
     if (process.env.OPENAI_API_KEY) {
       try {
-        console.log("[api/daily-tip] Generating AI tip...");
+        console.log("[api/daily-tip] Generating new AI tip...");
         const aiService = getAIService();
         dailyTip = await aiService.generateDailyTip(overarchingGoal, recentPractice || []);
         console.log("[api/daily-tip] AI tip generated successfully");
@@ -58,9 +90,29 @@ export async function GET() {
       dailyTip = generateFallbackTip(overarchingGoal);
     }
 
+    // Cache the generated tip in user profile
+    try {
+      await sb
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          last_tip_date: today,
+          last_tip_text: dailyTip,
+          last_tip_goal_title: overarchingGoal.title
+        }, {
+          onConflict: 'id'
+        });
+      console.log("[api/daily-tip] Tip cached in profile successfully");
+    } catch (cacheError) {
+      console.error("[api/daily-tip] Failed to cache tip:", cacheError);
+      // Continue anyway - caching failure shouldn't break the response
+    }
+
     return NextResponse.json({ 
       tip: dailyTip,
-      goal: overarchingGoal
+      cached: false,
+      goal_title: overarchingGoal.title,
+      generated_at: new Date().toISOString()
     });
 
   } catch (e) {

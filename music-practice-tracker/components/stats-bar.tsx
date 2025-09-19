@@ -57,10 +57,14 @@ export function StatsBar({ refreshTick }: { refreshTick: number }) {
 
   const saveGoal = async () => {
     const newGoal = parseInt(tempGoal);
-    if (isNaN(newGoal) || newGoal < 1 || newGoal > 480) return;
+    if (isNaN(newGoal) || newGoal < 1 || newGoal > 480) {
+      console.error("Invalid goal value:", tempGoal);
+      return;
+    }
     
     setIsSavingGoal(true);
     try {
+      console.log("Sending daily target update:", { dailyTarget: newGoal });
       const res = await fetch("/api/goal", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -68,15 +72,19 @@ export function StatsBar({ refreshTick }: { refreshTick: number }) {
       });
       
       if (res.ok) {
+        console.log("Daily target updated successfully");
         setIsEditingGoal(false);
         setTempGoal("");
         // Trigger refresh to update stats
         window.location.reload();
       } else {
-        console.error("Failed to update goal");
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Failed to update goal:", res.status, errorData);
+        setError(`Failed to update goal: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error updating goal:", error);
+      setError("Network error updating goal");
     } finally {
       setIsSavingGoal(false);
     }

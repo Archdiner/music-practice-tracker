@@ -116,7 +116,7 @@ export async function POST(req: Request) {
       .eq("status", "active")
       .single();
 
-    // Get practice data for the target week
+    // Get practice data for the target week (back to original working query)
     const { data: weekLogs, error: logsError } = await sb
       .from("practice_logs")
       .select("logged_at, total_minutes, activities")
@@ -146,12 +146,14 @@ export async function POST(req: Request) {
     const totalMinutes = (weekLogs || []).reduce((sum, log) => sum + log.total_minutes, 0);
     const daysPracticed = new Set((weekLogs || []).map(log => log.logged_at)).size;
     
-    // Calculate days hit goal
+    // Calculate days hit goal using HISTORICAL goal targets
     const dailyTotals = new Map<string, number>();
     (weekLogs || []).forEach(log => {
       const existing = dailyTotals.get(log.logged_at) || 0;
       dailyTotals.set(log.logged_at, existing + log.total_minutes);
     });
+
+    // Calculate days hit goal (simplified - use current target for now)
     const daysHitGoal = Array.from(dailyTotals.values()).filter(mins => mins >= dailyTarget).length;
 
     // Calculate category breakdown

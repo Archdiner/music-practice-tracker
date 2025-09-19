@@ -37,20 +37,44 @@ export async function PUT(req: Request) {
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-    const { data, error } = await sb
+    console.log(`[api/goal] Updating daily target for user ${user.id} to ${body.dailyTarget}`);
+
+    // First check if profile exists
+    const { data: existingProfile } = await sb
       .from("profiles")
-      .upsert({
-        id: user.id,
-        daily_target: body.dailyTarget,
-        updated_at: new Date().toISOString()
-      })
-      .select()
+      .select("id")
+      .eq("id", user.id)
       .single();
 
+    let result;
+    if (existingProfile) {
+      // Update existing profile
+      result = await sb
+        .from("profiles")
+        .update({ daily_target: body.dailyTarget })
+        .eq("id", user.id)
+        .select()
+        .single();
+    } else {
+      // Create new profile
+      result = await sb
+        .from("profiles")
+        .insert({
+          id: user.id,
+          daily_target: body.dailyTarget
+        })
+        .select()
+        .single();
+    }
+
+    const { data, error } = result;
+
     if (error) {
+      console.error("[api/goal] Database error:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    console.log("[api/goal] Successfully updated daily target:", data);
     return NextResponse.json({ ok: true, dailyTarget: body.dailyTarget });
   } catch (e) {
     console.error("[api/goal] PUT failed", e);

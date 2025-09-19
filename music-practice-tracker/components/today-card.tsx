@@ -32,6 +32,8 @@ export function TodayCard({
   // Daily tip state
   const [dailyTip, setDailyTip] = useState<string | null>(null)
   const [loadingTip, setLoadingTip] = useState(true)
+  const [tipCached, setTipCached] = useState(false)
+  const [tipGoalTitle, setTipGoalTitle] = useState<string | null>(null)
 
   const loadTodayEntries = async () => {
     try {
@@ -176,10 +178,11 @@ export function TodayCard({
     setEditingGoalText("");
   };
 
-  const loadDailyTip = async () => {
+  const loadDailyTip = async (forceRegenerate = false) => {
     try {
       setLoadingTip(true);
-      const res = await fetch("/api/daily-tip", {
+      const url = forceRegenerate ? "/api/daily-tip?forceRegenerate=true" : "/api/daily-tip";
+      const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       });
@@ -187,6 +190,9 @@ export function TodayCard({
       if (res.ok) {
         const data = await res.json();
         setDailyTip(data.tip);
+        setTipCached(data.cached || false);
+        setTipGoalTitle(data.goal_title || null);
+        console.log(`Daily tip loaded: ${data.cached ? 'cached' : 'fresh'}`);
       }
     } catch (error) {
       console.error("Failed to load daily tip:", error);
@@ -272,9 +278,28 @@ export function TodayCard({
           <div className="p-3 bg-apricot/5 border border-apricot/20 rounded-lg">
             <div className="flex items-start gap-2">
               <Target className="h-4 w-4 text-apricot mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs font-medium text-apricot mb-1">Today's Goal-Focused Tip</p>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-apricot">Today's Goal-Focused Tip</p>
+                  <div className="flex items-center gap-1">
+                    {tipCached && (
+                      <span className="text-xs text-muted-foreground">cached</span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => loadDailyTip(true)}
+                      disabled={loadingTip}
+                      className="h-5 w-5 p-0 hover:bg-apricot/10"
+                    >
+                      <Lightbulb className="h-3 w-3 text-apricot" />
+                    </Button>
+                  </div>
+                </div>
                 <p className="text-sm text-foreground">{dailyTip}</p>
+                {tipGoalTitle && (
+                  <p className="text-xs text-muted-foreground mt-1">For: {tipGoalTitle}</p>
+                )}
               </div>
             </div>
           </div>
@@ -443,9 +468,25 @@ export function TodayCard({
         </div>
 
         <div className="pt-2 border-t border-beige-300">
-          <p className="text-xs text-muted-foreground mb-2">
-            {selectedDate ? 'Practice Sessions' : "Today's Practice Sessions"}
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-muted-foreground">
+              {selectedDate ? 'Practice Sessions' : "Today's Practice Sessions"}
+            </p>
+            {todayEntries.length > 0 && (() => {
+              const allActivities = todayEntries.flatMap(entry => entry.activities || []);
+              const goalRelatedActivities = allActivities.filter(act => act.goal_related);
+              const goalRelatedMinutes = goalRelatedActivities.reduce((sum, act) => sum + (act.minutes || 0), 0);
+              const totalMinutes = allActivities.reduce((sum, act) => sum + (act.minutes || 0), 0);
+              const goalPercentage = totalMinutes > 0 ? Math.round((goalRelatedMinutes / totalMinutes) * 100) : 0;
+              
+              return goalPercentage > 0 ? (
+                <div className="flex items-center gap-1">
+                  <Target className="h-3 w-3 text-apricot" />
+                  <span className="text-xs text-apricot font-medium">{goalPercentage}% goal-focused</span>
+                </div>
+              ) : null;
+            })()}
+          </div>
           <div className="space-y-2">
             {loadingEntries ? (
               <div className="text-sm text-muted-foreground">Loading...</div>
@@ -456,7 +497,11 @@ export function TodayCard({
             ) : (
               todayEntries.flatMap((entry) => 
                 entry.activities?.map((activity: any, actIndex: number) => (
-                  <div key={`${entry.id}-${actIndex}`} className="flex items-center justify-between p-2 border border-beige-300/50 rounded-lg bg-card/50">
+                  <div key={`${entry.id}-${actIndex}`} className={`flex items-center justify-between p-2 border-2 rounded-lg ${
+                    activity.goal_related 
+                      ? 'border-apricot bg-apricot/8' 
+                      : 'border-beige-300/50 bg-card/50'
+                  }`}>
                     <div className="flex items-center gap-2 text-sm">
                       <div className={`w-2 h-2 rounded-full ${
                         activity.category === 'Technique' ? 'bg-sage' :
