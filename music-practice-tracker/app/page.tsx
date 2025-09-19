@@ -11,6 +11,7 @@ import { LogOut } from "lucide-react";
 export default function Dashboard() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const bump = () => setRefreshTick((x) => x + 1);
 
   const handleLogout = async () => {
@@ -83,13 +84,21 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - 2/3 width */}
           <div className="lg:col-span-2 space-y-6">
-            <CalendarHeatmap refreshTick={refreshTick} />
+            <CalendarHeatmap 
+              refreshTick={refreshTick} 
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+            />
             <WeeklyInsights onGenerated={bump} />
           </div>
 
           {/* Right Column - 1/3 width */}
           <div className="lg:col-span-1">
-            <TodayCard onSaved={bump} />
+            <TodayCard 
+              onSaved={bump} 
+              selectedDate={selectedDate}
+              onDateReset={() => setSelectedDate(null)}
+            />
           </div>
         </div>
       </div>

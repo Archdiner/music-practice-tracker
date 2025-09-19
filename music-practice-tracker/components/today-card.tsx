@@ -5,7 +5,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Music4, Plus, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 
-export function TodayCard({ onSaved }: { onSaved?: () => void }) {
+export function TodayCard({ 
+  onSaved, 
+  selectedDate, 
+  onDateReset 
+}: { 
+  onSaved?: () => void;
+  selectedDate: string | null;
+  onDateReset: () => void;
+}) {
   const [notes, setNotes] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -15,8 +23,8 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
 
   const loadTodayEntries = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const res = await fetch(`/api/entries?date=${today}`, {
+      const dateToLoad = selectedDate || new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/entries?date=${dateToLoad}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       });
@@ -26,7 +34,7 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
         setTodayEntries(data.entries || []);
       }
     } catch (error) {
-      console.error("Failed to load today's entries:", error);
+      console.error("Failed to load entries:", error);
     } finally {
       setLoadingEntries(false);
     }
@@ -57,17 +65,18 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
 
   useEffect(() => {
     loadTodayEntries();
-  }, []);
+  }, [selectedDate]);
 
   async function save(rawText: string) {
     setErr(null)
     if (!rawText.trim()) return;
     setIsSaving(true)
     try {
+      const dateToSave = selectedDate || new Date().toISOString().split('T')[0];
       const res = await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText })
+        body: JSON.stringify({ rawText, date: dateToSave })
       })
       if (res.status === 401) {
         if (typeof window !== "undefined") window.location.href = "/login";
@@ -79,7 +88,7 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
         return;
       }
       setNotes("")
-      // Reload today's entries after successful save
+      // Reload entries after successful save
       await loadTodayEntries();
       onSaved?.()
     } catch {
@@ -92,10 +101,32 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
   return (
     <Card className="rounded-2xl bg-card border border-beige-300 shadow-soft h-fit">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Music4 className="h-5 w-5" />
-          Today&apos;s Practice
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Music4 className="h-5 w-5" />
+            {selectedDate ? (
+              <>
+                Practice - {new Date(selectedDate).toLocaleDateString('en-US', { 
+                  weekday: 'short', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </>
+            ) : (
+              "Today's Practice"
+            )}
+          </CardTitle>
+          {selectedDate && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDateReset}
+              className="text-xs border-beige-300 hover:bg-apricot/10 hover:border-apricot text-muted-foreground hover:text-apricot"
+            >
+              Back to Today
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -118,12 +149,16 @@ export function TodayCard({ onSaved }: { onSaved?: () => void }) {
         </div>
 
         <div className="pt-2 border-t border-beige-300">
-          <p className="text-xs text-muted-foreground mb-2">Today&apos;s Practice Sessions</p>
+          <p className="text-xs text-muted-foreground mb-2">
+            {selectedDate ? 'Practice Sessions' : "Today's Practice Sessions"}
+          </p>
           <div className="space-y-2">
             {loadingEntries ? (
               <div className="text-sm text-muted-foreground">Loading...</div>
             ) : todayEntries.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No practice sessions logged today</div>
+              <div className="text-sm text-muted-foreground">
+                {selectedDate ? 'No practice sessions logged for this date' : "No practice sessions logged today"}
+              </div>
             ) : (
               todayEntries.flatMap((entry) => 
                 entry.activities?.map((activity: any, actIndex: number) => (

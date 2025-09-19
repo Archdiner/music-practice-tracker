@@ -2,7 +2,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export function CalendarHeatmap({ refreshTick }: { refreshTick: number }) {
+export function CalendarHeatmap({ 
+  refreshTick, 
+  selectedDate, 
+  onDateSelect 
+}: { 
+  refreshTick: number;
+  selectedDate: string | null;
+  onDateSelect: (date: string | null) => void;
+}) {
   const [byDate, setByDate] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +52,8 @@ export function CalendarHeatmap({ refreshTick }: { refreshTick: number }) {
     return data;
   }, [byDate]);
 
-  const getActivityColor = (level: number) => {
+  const getActivityColor = (level: number, date: string) => {
+    const isSelected = selectedDate === date;
     const colors = [
       "bg-muted/30", // 0 - no activity (beige)
       "bg-apricot/20", // 1 - low
@@ -52,7 +61,20 @@ export function CalendarHeatmap({ refreshTick }: { refreshTick: number }) {
       "bg-apricot/60", // 3 - medium-high
       "bg-apricot/80", // 4 - high (apricot)
     ]
-    return colors[level]
+    
+    if (isSelected) {
+      return "bg-apricot border-2 border-apricot-600 shadow-md";
+    }
+    
+    return colors[level];
+  };
+
+  const handleDateClick = (date: string) => {
+    if (selectedDate === date) {
+      onDateSelect(null); // Deselect if clicking the same date
+    } else {
+      onDateSelect(date);
+    }
   };
 
   return (
@@ -69,8 +91,9 @@ export function CalendarHeatmap({ refreshTick }: { refreshTick: number }) {
               {heatmapData.map((day, index) => (
                 <div
                   key={index}
-                  className={`w-3 h-3 rounded-sm ${getActivityColor(day.level)} border border-beige-300/50 hover:border-apricot transition-colors`}
+                  className={`w-3 h-3 rounded-sm ${getActivityColor(day.level, day.date)} border border-beige-300/50 hover:border-apricot transition-colors cursor-pointer`}
                   title={`${day.date}: ${byDate[day.date] || 0} minutes`}
+                  onClick={() => handleDateClick(day.date)}
                 />
               ))}
             </div>
@@ -80,7 +103,7 @@ export function CalendarHeatmap({ refreshTick }: { refreshTick: number }) {
                 {[0, 1, 2, 3, 4].map((level) => (
                   <div
                     key={level}
-                    className={`w-3 h-3 rounded-sm ${getActivityColor(level)} border border-beige-300/50`}
+                    className={`w-3 h-3 rounded-sm ${getActivityColor(level, "")} border border-beige-300/50`}
                     title={`Level ${level}`}
                   />
                 ))}
