@@ -12,7 +12,8 @@ const ActivitySchema = z.object({
     "Repertoire"
   ]),
   sub: z.string().min(1).max(100),
-  minutes: z.number().min(1).max(240)
+  minutes: z.number().min(1).max(240),
+  goal_related: z.boolean().optional() // Flag if activity relates to overarching goal
 });
 
 const ParsedEntrySchema = z.object({
@@ -36,9 +37,16 @@ class MusicPracticeAI {
     });
   }
 
-  async parseEntry(rawText: string): Promise<ParsedEntry> {
-    const prompt = `You are a music practice tracker AI. Parse the following practice session description into structured JSON.
+  async parseEntry(rawText: string, userGoal?: OverarchingGoal): Promise<ParsedEntry> {
+    const goalContext = userGoal ? `
+USER'S OVERARCHING GOAL:
+- Goal: ${userGoal.title}
+- Type: ${userGoal.goal_type}
+- Description: ${userGoal.description || 'No additional details'}
+` : '';
 
+    const prompt = `You are a music practice tracker AI. Parse the following practice session description into structured JSON.
+${goalContext}
 CATEGORIES (use exactly these):
 - "Technique": scales, arpeggios, exercises, finger work, bow technique, breathing, embouchure, posture
 - "Repertoire": specific pieces, songs, compositions, etudes, studies
@@ -54,6 +62,7 @@ RULES:
 4. Total minutes should not exceed 240 (4 hours)
 5. Each activity should be 1-240 minutes
 6. Return 1-10 activities maximum
+7. ${userGoal ? 'Set goal_related to true if the activity directly helps with their overarching goal' : 'Set goal_related to false for all activities'}
 
 INPUT: "${rawText}"
 
@@ -64,7 +73,8 @@ Return ONLY valid JSON in this exact format:
     {
       "category": "<category>",
       "sub": "<clear description>",
-      "minutes": <number>
+      "minutes": <number>,
+      "goal_related": <boolean>
     }
   ]
 }
@@ -130,8 +140,17 @@ Examples of good "sub" descriptions:
   }
 
   async generateWeeklyInsights(weekData: WeeklyData): Promise<WeeklyInsights> {
-    const prompt = `You are a music practice coach AI. Generate personalized weekly insights based on practice data.
+    const goalContext = weekData.overarchingGoal ? `
+OVERARCHING GOAL:
+- Goal: ${weekData.overarchingGoal.title}
+- Type: ${weekData.overarchingGoal.goal_type}
+- Difficulty: ${weekData.overarchingGoal.difficulty_level || 'Not specified'}
+- Target Date: ${weekData.overarchingGoal.target_date ? new Date(weekData.overarchingGoal.target_date).toLocaleDateString() : 'No deadline set'}
+- Description: ${weekData.overarchingGoal.description || 'No additional details'}
+` : '';
 
+    const prompt = `You are a music practice coach AI. Generate personalized weekly insights based on practice data.
+${goalContext}
 WEEK SUMMARY:
 - Total practice time: ${weekData.totalMinutes} minutes (${Math.round(weekData.totalMinutes/60*10)/10} hours)
 - Days practiced: ${weekData.daysPracticed}/7
@@ -165,13 +184,15 @@ Generate insights in this JSON format:
 
 GUIDELINES:
 1. Be encouraging and constructive
-2. Highlight both achievements and areas for improvement
+2. Highlight both achievements and areas for improvement  
 3. Make recommendations specific and actionable
 4. Use musician-friendly language
 5. Compare to previous week if data available
 6. Focus on balance across categories
 7. Celebrate consistency and progress
-8. Maximum 4 insights, 3 recommendations`;
+8. ${weekData.overarchingGoal ? 'ALWAYS include at least ONE insight about progress toward their overarching goal' : 'Focus on general improvement'}
+9. ${weekData.overarchingGoal ? 'Connect practice activities to goal advancement when relevant' : ''}
+10. Maximum 4 insights, 3 recommendations`;
 
     try {
       const completion = await this.openai.chat.completions.create({
@@ -216,6 +237,88 @@ GUIDELINES:
       throw new Error(`AI insights generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  async generateDailyTip(goal: OverarchingGoal, recentPractice: any[]): Promise<string> {
+    const recentActivities = recentPractice
+      .flatMap(log => log.activities || [])
+      .slice(0, 10)
+      .map(act => `${act.sub} (${act.minutes}min)`)
+      .join(', ');
+
+    const daysUntilTarget = goal.target_date 
+      ? Math.ceil((new Date(goal.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+
+    const prompt = `You are a music practice coach. Generate ONE specific, actionable practice tip for today.
+
+USER'S GOAL:
+- Title: ${goal.title}
+- Type: ${goal.goal_type}
+- Difficulty: ${goal.difficulty_level || 'Not specified'}
+- Target Date: ${goal.target_date ? `${daysUntilTarget} days away` : 'No deadline'}
+- Description: ${goal.description || 'No additional details'}
+
+RECENT PRACTICE (last 7 days):
+${recentActivities || 'No recent practice logged'}
+
+Generate a specific practice tip for TODAY that directly helps them progress toward their goal.
+
+REQUIREMENTS:
+- ONE sentence only
+- Specific and actionable
+- Directly related to their goal
+- Appropriate for their skill level
+- Focus on today's practice session
+
+Examples:
+- "Practice measures 16-24 of your Chopin piece slowly, focusing on the left-hand arpeggios."
+- "Spend 15 minutes on C major scales at 100 BPM to build finger independence for your exam."
+- "Work on sight-reading simple pieces in the key of your target composition."
+
+Return ONLY the tip text, no extra formatting or explanations.`;
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a concise music practice coach. Provide specific, actionable daily practice tips."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.4, // Slightly creative but focused
+        max_tokens: 100,
+      });
+
+      const tip = completion.choices[0]?.message?.content?.trim();
+      if (!tip) {
+        throw new Error('No tip generated from AI');
+      }
+
+      return tip;
+
+    } catch (error) {
+      console.error('AI daily tip generation error:', error);
+      throw new Error(`AI daily tip generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+}
+
+// Types for overarching goals
+export interface OverarchingGoal {
+  id: string;
+  title: string;
+  description?: string;
+  goal_type: "piece" | "exam" | "technique" | "performance" | "general";
+  difficulty_level?: "beginner" | "intermediate" | "advanced";
+  target_date?: string;
+  status: "active" | "completed" | "paused";
+  created_at: string;
+  updated_at: string;
 }
 
 // Types for weekly insights
@@ -231,6 +334,7 @@ export interface WeeklyData {
     sub: string;
     minutes: number;
   }>;
+  overarchingGoal?: OverarchingGoal;
 }
 
 export interface WeeklyInsight {

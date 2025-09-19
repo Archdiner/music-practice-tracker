@@ -50,12 +50,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     let parsed;
     let parsingMethod = "heuristic";
 
+    // Get user's overarching goal for context
+    const { data: overarchingGoal } = await sb
+      .from("overarching_goals")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single();
+
     // Try AI parsing first if enabled
     if (body.useAI && process.env.OPENAI_API_KEY) {
       try {
         console.log(`[api/entries/id] Attempting AI parsing for: "${body.rawText}"`);
         const aiService = getAIService();
-        parsed = await aiService.parseEntry(body.rawText);
+        parsed = await aiService.parseEntry(body.rawText, overarchingGoal || undefined);
         parsingMethod = "ai";
         console.log(`[api/entries/id] AI parsing successful:`, parsed);
       } catch (aiError) {

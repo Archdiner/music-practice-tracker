@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Get user's daily target
+    // Get user's daily target and overarching goal
     const { data: profile } = await sb
       .from("profiles")
       .select("daily_target")
@@ -107,6 +107,14 @@ export async function POST(req: Request) {
       .single();
     
     const dailyTarget = profile?.daily_target || 20;
+
+    // Get user's current overarching goal
+    const { data: overarchingGoal } = await sb
+      .from("overarching_goals")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single();
 
     // Get practice data for the target week
     const { data: weekLogs, error: logsError } = await sb
@@ -181,7 +189,8 @@ export async function POST(req: Request) {
       dailyTarget,
       previousWeekMinutes: previousWeekMinutes || undefined,
       categoryMinutes,
-      activities: allActivities
+      activities: allActivities,
+      overarchingGoal: overarchingGoal || undefined
     };
 
     // Generate AI insights (only if there's practice data)

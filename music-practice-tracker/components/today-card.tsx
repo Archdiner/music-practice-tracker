@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Music4, Plus, Trash2, CheckSquare, Square, X, Edit2, Check } from "lucide-react"
+import { Music4, Plus, Trash2, CheckSquare, Square, X, Edit2, Check, Target, Lightbulb } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function TodayCard({ 
@@ -28,6 +28,10 @@ export function TodayCard({
   const [newGoalText, setNewGoalText] = useState("")
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
   const [editingGoalText, setEditingGoalText] = useState("")
+  
+  // Daily tip state
+  const [dailyTip, setDailyTip] = useState<string | null>(null)
+  const [loadingTip, setLoadingTip] = useState(true)
 
   const loadTodayEntries = async () => {
     try {
@@ -172,8 +176,28 @@ export function TodayCard({
     setEditingGoalText("");
   };
 
+  const loadDailyTip = async () => {
+    try {
+      setLoadingTip(true);
+      const res = await fetch("/api/daily-tip", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setDailyTip(data.tip);
+      }
+    } catch (error) {
+      console.error("Failed to load daily tip:", error);
+    } finally {
+      setLoadingTip(false);
+    }
+  };
+
   useEffect(() => {
     loadTodayEntries();
+    loadDailyTip();
   }, [selectedDate]);
 
   useEffect(() => {
@@ -243,6 +267,19 @@ export function TodayCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Daily Tip Section */}
+        {dailyTip && (
+          <div className="p-3 bg-apricot/5 border border-apricot/20 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Target className="h-4 w-4 text-apricot mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-apricot mb-1">Today's Goal-Focused Tip</p>
+                <p className="text-sm text-foreground">{dailyTip}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Practice notes & goals</p>
           <Textarea

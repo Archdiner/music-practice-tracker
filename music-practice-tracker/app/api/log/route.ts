@@ -25,12 +25,20 @@ export async function POST(req: Request) {
     let parsed;
     let parsingMethod = "heuristic";
 
+    // Get user's overarching goal for context
+    const { data: overarchingGoal } = await sb
+      .from("overarching_goals")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .single();
+
     // Try AI parsing first if enabled
     if (body.useAI && process.env.OPENAI_API_KEY) {
       try {
         console.log(`[api/log] Attempting AI parsing for: "${body.rawText}"`);
         const aiService = getAIService();
-        parsed = await aiService.parseEntry(body.rawText);
+        parsed = await aiService.parseEntry(body.rawText, overarchingGoal || undefined);
         parsingMethod = "ai";
         console.log(`[api/log] AI parsing successful:`, parsed);
       } catch (aiError) {
