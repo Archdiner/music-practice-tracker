@@ -115,7 +115,7 @@ export function WeeklyInsights({ onGenerated }: { onGenerated?: () => void }) {
       case 'progress': return 'text-apricot';
       case 'achievement': return 'text-sage';
       case 'concern': return 'text-amber-600';
-      case 'recommendation': return 'text-blue-500';
+      case 'recommendation': return 'text-orange-500';
       default: return 'text-apricot';
     }
   };
@@ -171,7 +171,7 @@ export function WeeklyInsights({ onGenerated }: { onGenerated?: () => void }) {
 
             {/* AI Summary */}
             {insights.summary && (
-              <div className="p-3 bg-blue-50/50 border border-blue-200 rounded-lg">
+              <div className="p-3 bg-orange-50/50 border border-apricot/30 rounded-lg">
                 <p className="text-sm text-foreground">{insights.summary}</p>
               </div>
             )}

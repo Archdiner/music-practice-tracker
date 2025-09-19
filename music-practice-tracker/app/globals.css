@@ -4,8 +4,8 @@
 @import "tw-animate-css";
 
 :root {
-  /* Updated to warm palette with cream background and apricot accents */
-  --background: #f7f3ed; /* warm neutral cream */
+  /* Updated to warm palette with peachy orange background and apricot accents */
+  --background: #fdf2e9; /* peachy orange background */
   --foreground: #1f2937; /* dark gray text */
   --card: #fefcf8; /* slightly warmer white */
   --card-foreground: #1f2937;
@@ -102,12 +102,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    background-color: #fdf2e9 !important;
+  }
   body {
     @apply bg-background text-foreground;
-    /* Added subtle musical note pattern background */
-    background-image: radial-gradient(circle at 20% 80%, rgba(243, 156, 107, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(195, 90, 62, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(110, 169, 137, 0.02) 0%, transparent 50%);
+    /* Added subtle musical note pattern background with peachy tones */
+    background-image: radial-gradient(circle at 20% 80%, rgba(243, 156, 107, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(195, 90, 62, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(255, 179, 133, 0.03) 0%, transparent 50%);
     background-attachment: fixed;
   }
 
@@ -137,6 +140,15 @@
   }
 
   /* Custom color background utilities */
+  .bg-peachy {
+    background-color: #fdf2e9 !important;
+  }
+  
+  /* Ensure cards maintain their proper background */
+  .bg-card {
+    background-color: #fefcf8 !important;
+  }
+  
   .bg-apricot {
     background-color: #f39c6b;
   }
@@ -169,6 +181,15 @@
   }
   .text-amber {
     color: #e2b566;
+  }
+  .text-orange-500 {
+    color: #f97316;
+  }
+  .bg-orange-50 {
+    background-color: #fff7ed;
+  }
+  .border-apricot {
+    border-color: #f39c6b;
   }
 
   /* Added musical-themed utility classes */
