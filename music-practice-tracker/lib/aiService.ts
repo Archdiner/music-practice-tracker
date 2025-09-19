@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 
+// Note Log - AI Music Practice Tracker
 // Validation schema for AI parsing output
 const ActivitySchema = z.object({
   category: z.enum([

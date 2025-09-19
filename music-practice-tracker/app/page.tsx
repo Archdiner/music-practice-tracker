@@ -66,7 +66,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header with Logout */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground treble-clef">Music Practice Tracker</h1>
+          <h1 className="text-3xl font-bold text-foreground treble-clef">Note Log</h1>
           <Button
             onClick={handleLogout}
             variant="outline"
