@@ -4,32 +4,13 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
+import { getAIService, parseHeuristic } from "@/lib/aiService";
 
 const UpdateBody = z.object({
   rawText: z.string().min(1),
-  date: z.string().optional()
+  date: z.string().optional(),
+  useAI: z.boolean().optional().default(true) // Allow disabling AI for testing
 });
-
-function parseHeuristic(raw: string) {
-  const chunks = raw.split(/[;,]+/).map(s=>s.trim()).filter(Boolean);
-  let total = 0;
-  const acts = chunks.map(c=>{
-    const m = c.match(/(\d+)\s*(m|min)/i);
-    const minutes = m ? parseInt(m[1],10) : 10;
-    total += minutes;
-    const sub = c.replace(/(\d+)\s*(m|min)/i,'').trim() || "General";
-    const cat =
-      /(scale|arpeggio|slap|metronome|technique)/i.test(sub) ? "Technique" :
-      /(improv|jam)/i.test(sub) ? "Improvisation" :
-      /(ear|interval)/i.test(sub) ? "Ear" :
-      /(theory|mode|harmony)/i.test(sub) ? "Theory" :
-      /(record|mix)/i.test(sub) ? "Recording" :
-      "Repertoire";
-    return { category: cat, sub, minutes };
-  });
-  if (!acts.length) return { total_minutes: 30, activities:[{category:"Repertoire",sub:"General",minutes:30}] };
-  return { total_minutes: Math.min(total,240), activities: acts };
-}
 
 // GET: Retrieve a specific entry by ID
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -66,7 +47,25 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-    const parsed = parseHeuristic(body.rawText);
+    let parsed;
+    let parsingMethod = "heuristic";
+
+    // Try AI parsing first if enabled
+    if (body.useAI && process.env.OPENAI_API_KEY) {
+      try {
+        console.log(`[api/entries/id] Attempting AI parsing for: "${body.rawText}"`);
+        const aiService = getAIService();
+        parsed = await aiService.parseEntry(body.rawText);
+        parsingMethod = "ai";
+        console.log(`[api/entries/id] AI parsing successful:`, parsed);
+      } catch (aiError) {
+        console.log(`[api/entries/id] AI parsing failed, falling back to heuristic:`, aiError);
+        parsed = parseHeuristic(body.rawText);
+      }
+    } else {
+      console.log(`[api/entries/id] Using heuristic parsing (AI disabled or no API key)`);
+      parsed = parseHeuristic(body.rawText);
+    }
 
     const { data, error } = await sb
       .from("practice_logs")
@@ -84,7 +83,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     if (!data) return NextResponse.json({ error: "Entry not found or access denied" }, { status: 404 });
 
-    return NextResponse.json({ ok: true, entry: data });
+    return NextResponse.json({ 
+      ok: true, 
+      entry: data,
+      parsing_method: parsingMethod,
+      parsed_data: parsed 
+    });
   } catch (e) {
     console.error("[api/entries/id] PUT failed", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
