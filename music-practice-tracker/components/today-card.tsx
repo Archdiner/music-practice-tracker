@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Music4, Plus, Trash2 } from "lucide-react"
+import { Music4, Plus, Trash2, CheckSquare, Square } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function TodayCard({ 
@@ -20,6 +20,12 @@ export function TodayCard({
   const [todayEntries, setTodayEntries] = useState<any[]>([])
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [practiceGoals, setPracticeGoals] = useState<{id: string, text: string, completed: boolean}[]>([
+    { id: '1', text: 'Scales & Technique', completed: false },
+    { id: '2', text: 'Repertoire Practice', completed: false },
+    { id: '3', text: 'Ear Training', completed: false },
+    { id: '4', text: 'Theory Study', completed: false }
+  ])
 
   const loadTodayEntries = async () => {
     try {
@@ -61,6 +67,16 @@ export function TodayCard({
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const toggleGoal = (goalId: string) => {
+    setPracticeGoals(goals => 
+      goals.map(goal => 
+        goal.id === goalId 
+          ? { ...goal, completed: !goal.completed }
+          : goal
+      )
+    );
   };
 
   useEffect(() => {
@@ -146,6 +162,31 @@ export function TodayCard({
             Parse & Save
           </Button>
           {err && <span className="text-sm text-[#D26A6A]">{err}</span>}
+        </div>
+
+        {/* Practice Goals */}
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Today&apos;s Practice Goals</p>
+          <div className="space-y-2">
+            {practiceGoals.map((goal) => (
+              <div 
+                key={goal.id}
+                className="flex items-center gap-2 p-2 border border-beige-300/50 rounded-lg bg-card/50 hover:bg-card/70 transition-colors cursor-pointer"
+                onClick={() => toggleGoal(goal.id)}
+              >
+                <div className="flex-shrink-0">
+                  {goal.completed ? (
+                    <CheckSquare className="h-4 w-4 text-sage" />
+                  ) : (
+                    <Square className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+                <span className={`text-sm ${goal.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                  {goal.text}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="pt-2 border-t border-beige-300">
