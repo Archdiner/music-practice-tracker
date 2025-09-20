@@ -2,7 +2,7 @@
 import { supaBrowser } from "../../lib/supabaseBrowser";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Music4, Target } from "lucide-react";
 
@@ -14,9 +14,17 @@ export default function Login() {
   );
   const supabase = supaBrowser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for auth errors from callback
+    const error = searchParams.get('error');
+    if (error) {
+      setAuthError('Authentication failed. Please try again.');
+    }
+
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -131,6 +139,11 @@ export default function Login() {
 
         {/* Auth Card */}
         <div className="p-8 rounded-2xl border border-beige-300 bg-card shadow-soft">
+          {authError && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              {authError}
+            </div>
+          )}
           <Auth 
             supabaseClient={supabase} 
             appearance={{ 
@@ -139,8 +152,8 @@ export default function Login() {
             }} 
             providers={[]}
             redirectTo={typeof window !== 'undefined' ? 
-              (window.location.hostname === 'localhost' ? window.location.origin : 'https://note-log-lac.vercel.app') : 
-              'https://note-log-lac.vercel.app'
+              (window.location.hostname === 'localhost' ? `${window.location.origin}/auth/callback` : 'https://note-log-lac.vercel.app/auth/callback') : 
+              'https://note-log-lac.vercel.app/auth/callback'
             }
           />
         </div>
