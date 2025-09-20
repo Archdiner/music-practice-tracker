@@ -138,7 +138,10 @@ export default function Login() {
               variables: customTheme
             }} 
             providers={[]}
-            redirectTo={typeof window !== 'undefined' ? window.location.origin : undefined}
+            redirectTo={typeof window !== 'undefined' ? 
+              (window.location.hostname === 'localhost' ? window.location.origin : 'https://note-log-lac.vercel.app') : 
+              'https://note-log-lac.vercel.app'
+            }
           />
         </div>
 
