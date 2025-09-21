@@ -3,10 +3,10 @@ import { supaBrowser } from "../../lib/supabaseBrowser";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Music4, Target } from "lucide-react";
 
-export default function Login() {
+function LoginContent() {
   console.log(
     "SB env:",
     "URL len:", (process.env.NEXT_PUBLIC_SUPABASE_URL || "").length,
@@ -178,5 +178,13 @@ export default function Login() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="min-h-dvh flex items-center justify-center bg-background">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }
