@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
 import { getAIService, OverarchingGoal } from "@/lib/aiService";
+import { RateLimitError, QuotaExceededError } from "@/lib/aiUsage";
 
 const RegenerateTipBody = z.object({
   forceRegenerate: z.boolean().optional().default(false)
@@ -79,9 +80,12 @@ export async function GET(req: Request) {
       try {
         console.log("[api/daily-tip] Generating new AI tip...");
         const aiService = getAIService();
-        dailyTip = await aiService.generateDailyTip(overarchingGoal, recentPractice || []);
+        dailyTip = await aiService.generateDailyTip(user.id, overarchingGoal, recentPractice || []);
         console.log("[api/daily-tip] AI tip generated successfully");
       } catch (aiError) {
+        if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
+          return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
+        }
         console.error("[api/daily-tip] AI generation failed:", aiError);
         // Fallback to generic tip
         dailyTip = generateFallbackTip(overarchingGoal);

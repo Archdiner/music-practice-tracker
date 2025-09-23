@@ -48,6 +48,8 @@ export function WeeklyInsights({
   const [currentWeekStart, setCurrentWeekStart] = useState<string>("");
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
   const [isCurrentWeek, setIsCurrentWeek] = useState(false);
+  const [autoRegenBanner, setAutoRegenBanner] = useState<string | null>(null);
+  const [autoRegenGuardWeek, setAutoRegenGuardWeek] = useState<string | null>(null);
 
   const loadInsights = async (weekStartDate?: string, checkAutoGenerate = false, retryCount = 0) => {
     try {
@@ -85,7 +87,21 @@ export function WeeklyInsights({
       setInsights(data.insights);
       setCurrentWeekStart(data.weekStart);
       setAvailableWeeks(data.availableWeeks || []);
-      setIsCurrentWeek(data.isCurrentWeek || false);
+      // Prefer client-computed current-week
+      const clientIsCurrent = (data.weekStart || '') === getWeekStartLocal(new Date());
+      setIsCurrentWeek(clientIsCurrent);
+      // Auto-regenerate if past week and server indicates newer practice since last insights
+      if (data.needsRegeneration && !data.isCurrentWeek) {
+        // Guard against loops by checking the week we already auto-regenerated
+        if (autoRegenGuardWeek !== data.weekStart) {
+          setAutoRegenGuardWeek(data.weekStart);
+          console.log('Auto-regenerating insights for past week due to newer practice data');
+          const regen = await generateInsights(true, false, data.weekStart);
+          if (regen !== false) {
+            setAutoRegenBanner('Insights were refreshed based on recent practice updates.');
+          }
+        }
+      }
       
       // Auto-generate insights if needed
       if (data.needsAutoGeneration && !data.insights) {
@@ -129,6 +145,16 @@ export function WeeklyInsights({
           window.location.href = '/login';
           return;
         }
+        // Handle explicit current-week block with friendly message
+        if (response.status === 400) {
+          try {
+            const data = await response.json();
+            if (data?.isCurrentWeek && data?.message) {
+              setError(data.message);
+              return;
+            }
+          } catch {}
+        }
         
         // Retry on server errors with exponential backoff
         if (response.status >= 500 && retryCount < 2) {
@@ -149,8 +175,9 @@ export function WeeklyInsights({
       if (data.generated) {
         setInsights(data.insights);
         // Refresh available weeks after generating
-        loadInsights(weekStartDate || currentWeekStart);
+        loadInsights(weekStartDate || currentWeekStart, true);
         onGenerated?.();
+        return true;
       } else if (data.message) {
         // Handle different types of messages
         if (data.hasPracticeData === false) {
@@ -160,6 +187,7 @@ export function WeeklyInsights({
         } else {
           setError(data.message);
         }
+        return false;
       }
     } catch (err) {
       console.error('Failed to generate weekly insights:', err);
@@ -175,36 +203,50 @@ export function WeeklyInsights({
       } else {
         setError(errorMessage);
       }
+      return false;
     } finally {
       setGenerating(false);
     }
   };
 
   useEffect(() => {
-    loadInsights(undefined, true); // Check for auto-generation on mount
+    const currentWeekStart = getWeekStartLocal(new Date());
+    loadInsights(currentWeekStart, true);
   }, []);
 
   // Handle date selection from heatmap
   useEffect(() => {
     if (selectedDate) {
-      const weekStart = getWeekBoundaries(new Date(selectedDate));
-      loadInsights(weekStart);
-      onWeekChange?.(weekStart);
+      const weekStart = getWeekStartLocal(new Date(selectedDate));
+      loadInsights(weekStart, true);
+      // Do NOT call onWeekChange here; parent uses it to clear selected date.
     }
   }, [selectedDate]);
 
-  // Helper function to get week boundaries
-  const getWeekBoundaries = (date: Date) => {
-    const d = new Date(date);
+  // Helpers to compute week start in LOCAL time (avoid UTC off-by-one)
+  const formatLocalYYYYMMDD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const getWeekStartLocal = (date: Date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
-    return monday.toISOString().split('T')[0];
+    return formatLocalYYYYMMDD(monday);
+  };
+
+  const parseLocalDate = (yyyyMmDd: string) => {
+    const [y, m, d] = yyyyMmDd.split('-').map(Number);
+    return new Date((y as number), (m as number) - 1, (d as number));
   };
 
   // Navigation functions
   const navigateToWeek = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(currentWeekStart);
+    const currentDate = parseLocalDate(currentWeekStart);
     let targetDate: Date;
     
     if (direction === 'prev') {
@@ -217,22 +259,22 @@ export function WeeklyInsights({
       targetDate.setDate(targetDate.getDate() + 7);
     }
     
-    const targetWeekStart = getWeekBoundaries(targetDate);
+    const targetWeekStart = getWeekStartLocal(targetDate);
     
-    // Check if we're going into the future (beyond current week)
+    // Prevent navigating beyond the current week (but allow navigating into the current week)
     const today = new Date();
-    const currentWeekStartDate = getWeekBoundaries(today);
+    const currentWeekStartDate = getWeekStartLocal(today);
     if (targetWeekStart > currentWeekStartDate) {
-      return; // Don't navigate to future weeks
+      return;
     }
     
-    loadInsights(targetWeekStart);
+    loadInsights(targetWeekStart, true);
     onWeekChange?.(targetWeekStart);
   };
 
   // Check navigation availability
   const today = new Date();
-  const currentWeekStartDate = getWeekBoundaries(today);
+  const currentWeekStartDate = getWeekStartLocal(today);
   const canNavigatePrev = currentWeekStart !== "" && currentWeekStart > "2024-01-01"; // Reasonable limit
   const canNavigateNext = currentWeekStart !== "" && currentWeekStart < currentWeekStartDate;
 
@@ -319,8 +361,9 @@ export function WeeklyInsights({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  loadInsights();
-                  onWeekChange?.("");
+                  const cur = getWeekStartLocal(new Date());
+                  loadInsights(cur, true);
+                  onWeekChange?.(cur);
                 }}
                 className="p-1 h-8 w-8 text-apricot hover:bg-apricot/10"
                 title="Back to current week"
@@ -349,6 +392,12 @@ export function WeeklyInsights({
             }`}>
               {error}
             </p>
+          </div>
+        )}
+
+        {autoRegenBanner && (
+          <div className="p-2 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-xs text-green-700">{autoRegenBanner}</p>
           </div>
         )}
 
@@ -427,16 +476,10 @@ export function WeeklyInsights({
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <AlertCircle className="h-8 w-8 text-blue-500 mx-auto mb-2" />
               <p className="text-sm text-blue-700 font-medium mb-2">
-                {isCurrentWeek 
-                  ? "This week is still in progress"
-                  : "No practice data found for this week"
-                }
+                {isCurrentWeek ? "This week is still in progress" : "No practice data found for this week"}
               </p>
               <p className="text-xs text-blue-600">
-                {isCurrentWeek 
-                  ? "Insights will be generated automatically when the week ends."
-                  : "Any practice data (even just one day) will generate insights for this week!"
-                }
+                {isCurrentWeek ? "Insights will be generated automatically when the week ends." : "Any practice data (even just one day) will generate insights for this week!"}
               </p>
             </div>
           </div>
@@ -447,8 +490,8 @@ export function WeeklyInsights({
           <div className="flex gap-2">
             <Button 
               className="flex-1 bg-apricot text-white hover:bg-apricot-600 shadow-soft" 
-              onClick={() => generateInsights(false)}
-              disabled={generating}
+              onClick={() => generateInsights(false, false, currentWeekStart)}
+              disabled={generating || isCurrentWeek}
             >
               {generating ? (
                 <>
@@ -458,7 +501,7 @@ export function WeeklyInsights({
               ) : (
                 <>
                   <Timer className="h-4 w-4 mr-2" />
-                  Generate Insights
+                  {isCurrentWeek ? 'Insights generate at week end' : 'Generate Insights'}
                 </>
               )}
             </Button>

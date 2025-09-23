@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
 import { getAIService, parseHeuristic } from "@/lib/aiService";
+import { RateLimitError, QuotaExceededError } from "@/lib/aiUsage";
 
 const UpdateBody = z.object({
   rawText: z.string().min(1),
@@ -63,10 +64,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       try {
         console.log(`[api/entries/id] Attempting AI parsing for: "${body.rawText}"`);
         const aiService = getAIService();
-        parsed = await aiService.parseEntry(body.rawText, overarchingGoal || undefined);
+        parsed = await aiService.parseEntry(user.id, body.rawText, overarchingGoal || undefined);
         parsingMethod = "ai";
         console.log(`[api/entries/id] AI parsing successful:`, parsed);
       } catch (aiError) {
+        if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
+          return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
+        }
         console.log(`[api/entries/id] AI parsing failed, falling back to heuristic:`, aiError);
         parsed = parseHeuristic(body.rawText);
       }

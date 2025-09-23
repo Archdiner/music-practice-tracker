@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { enforceAiLimits, recordAiUsage, RateLimitError, QuotaExceededError } from '@/lib/aiUsage';
 
 // Note Log - AI Music Practice Tracker
 // Validation schema for AI parsing output
@@ -38,7 +39,7 @@ class MusicPracticeAI {
     });
   }
 
-  async parseEntry(rawText: string, userGoal?: OverarchingGoal): Promise<ParsedEntry> {
+  async parseEntry(userId: string, rawText: string, userGoal?: OverarchingGoal): Promise<ParsedEntry> {
     const goalContext = userGoal ? `
 USER'S OVERARCHING GOAL:
 - Goal: ${userGoal.title}
@@ -89,6 +90,10 @@ Examples of good "sub" descriptions:
 - "Recording demo track"`;
 
     try {
+      // conservative estimate: prompt length ~ rawText length / 3 tokens + overhead
+      const estimatedPromptTokens = Math.ceil(rawText.length / 3) + 400;
+      await enforceAiLimits(userId, { endpoint: "parseEntry", model: "gpt-4o-mini", estimatedTotalTokens: estimatedPromptTokens + 500 });
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini", // More cost-effective than gpt-4
         messages: [
@@ -104,6 +109,19 @@ Examples of good "sub" descriptions:
         temperature: 0.1, // Low temperature for consistent parsing
         max_tokens: 500,
       });
+
+      // Record usage if available
+      try {
+        const usage = (completion as any).usage || undefined;
+        await recordAiUsage({
+          userId,
+          endpoint: "parseEntry",
+          model: "gpt-4o-mini",
+          promptTokens: usage?.prompt_tokens ?? null,
+          completionTokens: usage?.completion_tokens ?? null,
+          totalTokens: usage?.total_tokens ?? null,
+        });
+      } catch {}
 
       const content = completion.choices[0]?.message?.content?.trim();
       if (!content) {
@@ -130,6 +148,9 @@ Examples of good "sub" descriptions:
 
     } catch (error) {
       console.error('AI parsing error:', error);
+      if (error instanceof RateLimitError || error instanceof QuotaExceededError) {
+        throw error;
+      }
       
       // If AI fails, throw error so we can fallback to heuristic parsing
       if (error instanceof z.ZodError) {
@@ -140,7 +161,7 @@ Examples of good "sub" descriptions:
     }
   }
 
-  async generateWeeklyInsights(weekData: WeeklyData): Promise<WeeklyInsights> {
+  async generateWeeklyInsights(userId: string, weekData: WeeklyData): Promise<WeeklyInsights> {
     const goalContext = weekData.overarchingGoal ? `
 OVERARCHING GOAL:
 - Goal: ${weekData.overarchingGoal.title}
@@ -199,6 +220,9 @@ GUIDELINES:
 13. Never make the user feel bad about practicing fewer days - celebrate any practice`;
 
     try {
+      const estimatedPromptTokens = 800 + Math.ceil(JSON.stringify(weekData).length / 4);
+      await enforceAiLimits(userId, { endpoint: "weeklyInsights", model: "gpt-4o-mini", estimatedTotalTokens: estimatedPromptTokens + 800 });
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -214,6 +238,19 @@ GUIDELINES:
         temperature: 0.3, // Slightly creative but consistent
         max_tokens: 800,
       });
+
+      // Record usage
+      try {
+        const usage = (completion as any).usage || undefined;
+        await recordAiUsage({
+          userId,
+          endpoint: "weeklyInsights",
+          model: "gpt-4o-mini",
+          promptTokens: usage?.prompt_tokens ?? null,
+          completionTokens: usage?.completion_tokens ?? null,
+          totalTokens: usage?.total_tokens ?? null,
+        });
+      } catch {}
 
       const content = completion.choices[0]?.message?.content?.trim();
       if (!content) {
@@ -238,11 +275,14 @@ GUIDELINES:
 
     } catch (error) {
       console.error('AI insights generation error:', error);
+      if (error instanceof RateLimitError || error instanceof QuotaExceededError) {
+        throw error;
+      }
       throw new Error(`AI insights generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  async generateDailyTip(goal: OverarchingGoal, recentPractice: any[]): Promise<string> {
+  async generateDailyTip(userId: string, goal: OverarchingGoal, recentPractice: any[]): Promise<string> {
     const recentActivities = recentPractice
       .flatMap(log => log.activities || [])
       .slice(0, 10)
@@ -282,6 +322,9 @@ Examples:
 Return ONLY the tip text, no extra formatting or explanations.`;
 
     try {
+      const estimatedPromptTokens = 600;
+      await enforceAiLimits(userId, { endpoint: "dailyTip", model: "gpt-4o-mini", estimatedTotalTokens: estimatedPromptTokens + 100 });
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -298,6 +341,19 @@ Return ONLY the tip text, no extra formatting or explanations.`;
         max_tokens: 100,
       });
 
+      // Record usage
+      try {
+        const usage = (completion as any).usage || undefined;
+        await recordAiUsage({
+          userId,
+          endpoint: "dailyTip",
+          model: "gpt-4o-mini",
+          promptTokens: usage?.prompt_tokens ?? null,
+          completionTokens: usage?.completion_tokens ?? null,
+          totalTokens: usage?.total_tokens ?? null,
+        });
+      } catch {}
+
       const tip = completion.choices[0]?.message?.content?.trim();
       if (!tip) {
         throw new Error('No tip generated from AI');
@@ -307,6 +363,9 @@ Return ONLY the tip text, no extra formatting or explanations.`;
 
     } catch (error) {
       console.error('AI daily tip generation error:', error);
+      if (error instanceof RateLimitError || error instanceof QuotaExceededError) {
+        throw error;
+      }
       throw new Error(`AI daily tip generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

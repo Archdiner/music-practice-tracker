@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
 import { getAIService, WeeklyData, WeeklyInsights } from "@/lib/aiService";
+import { RateLimitError, QuotaExceededError } from "@/lib/aiUsage";
 
 const GenerateInsightsBody = z.object({
   weekStartDate: z.string().optional(), // YYYY-MM-DD format, defaults to current week
@@ -13,25 +14,30 @@ const GenerateInsightsBody = z.object({
 });
 
 // Helper function to get week boundaries (Monday to Sunday)
+function formatLocalYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getWeekBoundaries(date: Date): { weekStart: string; weekEnd: string } {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-  const monday = new Date(d.setDate(diff));
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  
-  return {
-    weekStart: monday.toISOString().split('T')[0],
-    weekEnd: sunday.toISOString().split('T')[0]
-  };
+  // Work in local time, Monday-Sunday week
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dow = d.getDay();
+  const diff = d.getDate() - dow + (dow === 0 ? -6 : 1);
+  const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return { weekStart: formatLocalYYYYMMDD(monday), weekEnd: formatLocalYYYYMMDD(sunday) };
 }
 
 // Helper function to check if a week has ended
 function hasWeekEnded(weekEnd: string): boolean {
-  const today = new Date();
-  const weekEndDate = new Date(weekEnd);
-  return today > weekEndDate;
+  // Treat week end as local Sunday 23:59:59
+  const [y, m, d] = weekEnd.split('-').map(Number);
+  const end = new Date(y, (m as number) - 1, d as number, 23, 59, 59, 999);
+  const now = new Date();
+  return now.getTime() > end.getTime();
 }
 
 // Helper function to get the most recent completed week
@@ -48,6 +54,13 @@ function getMostRecentCompletedWeek(): { weekStart: string; weekEnd: string } {
   
   // If current week has ended, return current week
   return currentWeek;
+}
+
+function getNextWeekStart(weekStart: string): string {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const monday = new Date(y as number, (m as number) - 1, d as number);
+  const nextMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+  return formatLocalYYYYMMDD(nextMonday);
 }
 
 // Generate basic insights when AI is not available or for minimal data
@@ -153,8 +166,8 @@ export async function GET(req: Request) {
     let weekEnd: string;
     
     if (weekStartDate) {
-      // Specific week requested
-      targetDate = new Date(weekStartDate);
+      // Specific week requested; parse as local date
+      targetDate = new Date(`${weekStartDate}T00:00:00`);
       const boundaries = getWeekBoundaries(targetDate);
       weekStart = boundaries.weekStart;
       weekEnd = boundaries.weekEnd;
@@ -179,10 +192,34 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Check if we should auto-generate insights for a completed week
+    // Determine if there is practice data in this week and whether regeneration is needed
+    const { data: weekLogs } = await sb
+      .from("practice_logs")
+      .select("logged_at, total_minutes, updated_at")
+      .eq("user_id", user.id)
+      .gte("logged_at", weekStart)
+      .lt("logged_at", getNextWeekStart(weekStart));
+
+    const totalMinutes = (weekLogs || []).reduce((sum, log) => sum + (log.total_minutes || 0), 0);
+    const hasPracticeData = totalMinutes > 0;
+
     let needsAutoGeneration = false;
-    if (checkAutoGenerate && !existingInsights && hasWeekEnded(weekEnd)) {
-      needsAutoGeneration = true;
+    let needsRegeneration = false;
+    let latestLogUpdateAt: string | null = null;
+    if (weekLogs && weekLogs.length) {
+      latestLogUpdateAt = weekLogs
+        .map(log => (log as any).updated_at || (log as any).logged_at)
+        .sort()
+        .slice(-1)[0] || null;
+    }
+
+    if (!existingInsights) {
+      if (checkAutoGenerate && hasWeekEnded(weekEnd)) {
+        needsAutoGeneration = true;
+      }
+    } else if (latestLogUpdateAt && existingInsights.created_at && latestLogUpdateAt > existingInsights.created_at) {
+      // Newer data than saved insights
+      needsRegeneration = true;
     }
 
     // Get list of available weeks for navigation
@@ -198,6 +235,8 @@ export async function GET(req: Request) {
       weekStart,
       weekEnd,
       needsAutoGeneration,
+      needsRegeneration,
+      hasPracticeData,
       availableWeeks: availableWeeks?.map(w => w.week_start) || [],
       isCurrentWeek: weekStart === getWeekBoundaries(new Date()).weekStart
     });
@@ -218,43 +257,26 @@ export async function POST(req: Request) {
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-    // Get target week boundaries
-    const targetDate = body.weekStartDate ? new Date(body.weekStartDate) : new Date();
+    // Get target week boundaries (parse provided date as LOCAL midnight)
+    const targetDate = body.weekStartDate ? new Date(`${body.weekStartDate}T00:00:00`) : new Date();
     const { weekStart, weekEnd } = getWeekBoundaries(targetDate);
 
     console.log(`[api/weekly-insights] Generating insights for week ${weekStart} to ${weekEnd}`);
 
-    // Check if insights already exist - NO REGENERATION ALLOWED for final insights
-    const { data: existing } = await sb
-      .from("weekly_insights")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("week_start", weekStart)
-      .single();
-
-    if (existing) {
-      // If insights are marked as final, never allow regeneration
-      // Check if is_final column exists and is true
-      if (existing.is_final === true) {
-        return NextResponse.json({ 
-          insights: existing,
-          generated: false,
-          message: "Final insights for this week cannot be regenerated",
-          isFinal: true
-        });
-      }
-      
-      // Only allow regeneration if not final and explicitly requested
-      if (!body.forceRegenerate) {
-        return NextResponse.json({ 
-          insights: existing,
-          generated: false,
-          message: "Insights already exist for this week"
-        });
-      }
+    // Block manual generation for ongoing/current week. Allow only auto-generation after week ends.
+    if (!hasWeekEnded(weekEnd) && !body.autoGenerate) {
+      return NextResponse.json({
+        insights: null,
+        generated: false,
+        message: "Weekly insights for the current week will be generated automatically when the week ends.",
+        isCurrentWeek: true,
+        hasPracticeData: undefined
+      }, { status: 400 });
     }
 
-    // For auto-generation, only generate for completed weeks
+    // Simplified: Allow generation/upsert for past weeks regardless of existing rows
+
+    // Auto-generation still only for completed weeks
     if (body.autoGenerate && !hasWeekEnded(weekEnd)) {
       return NextResponse.json({
         insights: null,
@@ -280,13 +302,13 @@ export async function POST(req: Request) {
       .eq("status", "active")
       .single();
 
-    // Get practice data for the target week (back to original working query)
+    // Get practice data for the target week (ensure full-week coverage)
     const { data: weekLogs, error: logsError } = await sb
       .from("practice_logs")
       .select("logged_at, total_minutes, activities")
       .eq("user_id", user.id)
       .gte("logged_at", weekStart)
-      .lte("logged_at", weekEnd)
+      .lt("logged_at", getNextWeekStart(weekStart))
       .order("logged_at", { ascending: true });
 
     if (logsError) {
@@ -310,12 +332,12 @@ export async function POST(req: Request) {
     const totalMinutes = (weekLogs || []).reduce((sum, log) => sum + log.total_minutes, 0);
     const daysPracticed = new Set((weekLogs || []).map(log => log.logged_at)).size;
     
-    // Handle case where there's no practice data for the week
+    // If there is no practice at all in the week, do not generate insights
     if (totalMinutes === 0 && daysPracticed === 0) {
       return NextResponse.json({
         insights: null,
         generated: false,
-        message: "No practice data found for this week. Start practicing to generate insights!",
+        message: "No practice data found for this week.",
         hasPracticeData: false
       });
     }
@@ -375,9 +397,12 @@ export async function POST(req: Request) {
       try {
         console.log(`[api/weekly-insights] Generating AI insights for week with ${daysPracticed} days practiced and ${totalMinutes} minutes...`);
         const aiService = getAIService();
-        aiInsights = await aiService.generateWeeklyInsights(weekData);
+        aiInsights = await aiService.generateWeeklyInsights(user.id, weekData);
         console.log("[api/weekly-insights] AI insights generated successfully");
       } catch (aiError) {
+        if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
+          return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
+        }
         console.error("[api/weekly-insights] AI generation failed:", aiError);
         // Continue without AI insights rather than failing completely
       }

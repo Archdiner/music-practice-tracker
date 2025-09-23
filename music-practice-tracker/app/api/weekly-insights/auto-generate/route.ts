@@ -5,25 +5,28 @@ import { NextResponse } from "next/server";
 import { supaServer } from "@/lib/supabaseServer";
 
 // Helper function to get week boundaries (Monday to Sunday)
+function formatLocalYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getWeekBoundaries(date: Date): { weekStart: string; weekEnd: string } {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-  const monday = new Date(d.setDate(diff));
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  
-  return {
-    weekStart: monday.toISOString().split('T')[0],
-    weekEnd: sunday.toISOString().split('T')[0]
-  };
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dow = d.getDay();
+  const diff = d.getDate() - dow + (dow === 0 ? -6 : 1);
+  const monday = new Date(d.getFullYear(), d.getMonth(), diff);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return { weekStart: formatLocalYYYYMMDD(monday), weekEnd: formatLocalYYYYMMDD(sunday) };
 }
 
 // Helper function to check if a week has ended
 function hasWeekEnded(weekEnd: string): boolean {
-  const today = new Date();
-  const weekEndDate = new Date(weekEnd);
-  return today > weekEndDate;
+  const [y, m, d] = weekEnd.split('-').map(Number);
+  const end = new Date(y, (m as number) - 1, d as number, 23, 59, 59, 999);
+  const now = new Date();
+  return now.getTime() > end.getTime();
 }
 
 // POST: Auto-generate insights for completed weeks
