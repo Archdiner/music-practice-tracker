@@ -8,7 +8,8 @@ import { getAIService, WeeklyData, WeeklyInsights } from "@/lib/aiService";
 
 const GenerateInsightsBody = z.object({
   weekStartDate: z.string().optional(), // YYYY-MM-DD format, defaults to current week
-  forceRegenerate: z.boolean().optional().default(false)
+  forceRegenerate: z.boolean().optional().default(false),
+  autoGenerate: z.boolean().optional().default(false) // For automatic generation
 });
 
 // Helper function to get week boundaries (Monday to Sunday)
@@ -26,6 +27,115 @@ function getWeekBoundaries(date: Date): { weekStart: string; weekEnd: string } {
   };
 }
 
+// Helper function to check if a week has ended
+function hasWeekEnded(weekEnd: string): boolean {
+  const today = new Date();
+  const weekEndDate = new Date(weekEnd);
+  return today > weekEndDate;
+}
+
+// Helper function to get the most recent completed week
+function getMostRecentCompletedWeek(): { weekStart: string; weekEnd: string } {
+  const today = new Date();
+  const currentWeek = getWeekBoundaries(today);
+  
+  // If current week hasn't ended, return previous week
+  if (!hasWeekEnded(currentWeek.weekEnd)) {
+    const prevWeek = new Date(today);
+    prevWeek.setDate(prevWeek.getDate() - 7);
+    return getWeekBoundaries(prevWeek);
+  }
+  
+  // If current week has ended, return current week
+  return currentWeek;
+}
+
+// Generate basic insights when AI is not available or for minimal data
+function generateBasicInsights(weekData: WeeklyData): WeeklyInsights {
+  const { totalMinutes, daysPracticed, daysHitGoal, dailyTarget, categoryMinutes, previousWeekMinutes } = weekData;
+  
+  // Create basic summary
+  let summary = `You practiced ${totalMinutes} minutes across ${daysPracticed} day${daysPracticed !== 1 ? 's' : ''} this week.`;
+  
+  if (daysHitGoal > 0) {
+    summary += ` You hit your daily goal ${daysHitGoal} time${daysHitGoal !== 1 ? 's' : ''}.`;
+  }
+  
+  if (previousWeekMinutes !== undefined) {
+    const change = totalMinutes - previousWeekMinutes;
+    if (change > 0) {
+      summary += ` That's ${change} more minutes than last week!`;
+    } else if (change < 0) {
+      summary += ` That's ${Math.abs(change)} fewer minutes than last week.`;
+    } else {
+      summary += ` That's the same as last week.`;
+    }
+  }
+  
+  // Generate basic insights
+  const insights = [];
+  
+  if (daysPracticed === 1) {
+    insights.push({
+      type: 'progress' as const,
+      title: 'Getting Started',
+      content: 'Great job starting your practice routine!',
+      icon: 'trending-up' as const
+    });
+  } else if (daysPracticed >= 3) {
+    insights.push({
+      type: 'achievement' as const,
+      title: 'Consistent Practice',
+      content: `You practiced ${daysPracticed} days this week - excellent consistency!`,
+      icon: 'award' as const
+    });
+  }
+  
+  if (daysHitGoal > 0) {
+    insights.push({
+      type: 'achievement' as const,
+      title: 'Goal Achievement',
+      content: `You hit your daily goal ${daysHitGoal} time${daysHitGoal !== 1 ? 's' : ''}!`,
+      icon: 'target' as const
+    });
+  }
+  
+  // Add category insights
+  const topCategory = Object.entries(categoryMinutes).reduce((a, b) => 
+    categoryMinutes[a[0]] > categoryMinutes[b[0]] ? a : b, ['', 0]
+  );
+  
+  if (topCategory[1] > 0) {
+    insights.push({
+      type: 'progress' as const,
+      title: 'Focus Area',
+      content: `You spent most time on ${topCategory[0]} (${Math.round(topCategory[1]/totalMinutes*100)}%)`,
+      icon: 'trending-up' as const
+    });
+  }
+  
+  // Generate recommendations
+  const recommendations = [];
+  
+  if (daysPracticed < 3) {
+    recommendations.push('Try to practice at least 3 days per week for better progress');
+  }
+  
+  if (daysHitGoal === 0 && daysPracticed > 0) {
+    recommendations.push('Consider breaking your practice into smaller daily sessions');
+  }
+  
+  if (Object.keys(categoryMinutes).length === 1) {
+    recommendations.push('Try to diversify your practice across different areas');
+  }
+  
+  return {
+    summary,
+    insights,
+    recommendations
+  };
+}
+
 // GET: Retrieve existing weekly insights
 export async function GET(req: Request) {
   try {
@@ -36,9 +146,25 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const weekStartDate = url.searchParams.get("weekStartDate");
+    const checkAutoGenerate = url.searchParams.get("checkAutoGenerate") === "true";
     
-    let targetDate = weekStartDate ? new Date(weekStartDate) : new Date();
-    const { weekStart } = getWeekBoundaries(targetDate);
+    let targetDate: Date;
+    let weekStart: string;
+    let weekEnd: string;
+    
+    if (weekStartDate) {
+      // Specific week requested
+      targetDate = new Date(weekStartDate);
+      const boundaries = getWeekBoundaries(targetDate);
+      weekStart = boundaries.weekStart;
+      weekEnd = boundaries.weekEnd;
+    } else {
+      // Get most recent completed week
+      const boundaries = getMostRecentCompletedWeek();
+      weekStart = boundaries.weekStart;
+      weekEnd = boundaries.weekEnd;
+      targetDate = new Date(weekStart);
+    }
 
     // Get existing insights for this week
     const { data: existingInsights, error } = await sb
@@ -53,10 +179,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Check if we should auto-generate insights for a completed week
+    let needsAutoGeneration = false;
+    if (checkAutoGenerate && !existingInsights && hasWeekEnded(weekEnd)) {
+      needsAutoGeneration = true;
+    }
+
+    // Get list of available weeks for navigation
+    const { data: availableWeeks } = await sb
+      .from("weekly_insights")
+      .select("week_start")
+      .eq("user_id", user.id)
+      .order("week_start", { ascending: false })
+      .limit(10);
+
     return NextResponse.json({ 
       insights: existingInsights || null,
       weekStart,
-      weekEnd: getWeekBoundaries(targetDate).weekEnd
+      weekEnd,
+      needsAutoGeneration,
+      availableWeeks: availableWeeks?.map(w => w.week_start) || [],
+      isCurrentWeek: weekStart === getWeekBoundaries(new Date()).weekStart
     });
 
   } catch (e) {
@@ -81,22 +224,43 @@ export async function POST(req: Request) {
 
     console.log(`[api/weekly-insights] Generating insights for week ${weekStart} to ${weekEnd}`);
 
-    // Check if insights already exist and don't force regenerate
-    if (!body.forceRegenerate) {
-      const { data: existing } = await sb
-        .from("weekly_insights")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("week_start", weekStart)
-        .single();
+    // Check if insights already exist - NO REGENERATION ALLOWED for final insights
+    const { data: existing } = await sb
+      .from("weekly_insights")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("week_start", weekStart)
+      .single();
 
-      if (existing) {
+    if (existing) {
+      // If insights are marked as final, never allow regeneration
+      // Check if is_final column exists and is true
+      if (existing.is_final === true) {
+        return NextResponse.json({ 
+          insights: existing,
+          generated: false,
+          message: "Final insights for this week cannot be regenerated",
+          isFinal: true
+        });
+      }
+      
+      // Only allow regeneration if not final and explicitly requested
+      if (!body.forceRegenerate) {
         return NextResponse.json({ 
           insights: existing,
           generated: false,
           message: "Insights already exist for this week"
         });
       }
+    }
+
+    // For auto-generation, only generate for completed weeks
+    if (body.autoGenerate && !hasWeekEnded(weekEnd)) {
+      return NextResponse.json({
+        insights: null,
+        generated: false,
+        message: "Cannot auto-generate insights for incomplete week"
+      });
     }
 
     // Get user's daily target and overarching goal
@@ -145,6 +309,16 @@ export async function POST(req: Request) {
     // Calculate week statistics
     const totalMinutes = (weekLogs || []).reduce((sum, log) => sum + log.total_minutes, 0);
     const daysPracticed = new Set((weekLogs || []).map(log => log.logged_at)).size;
+    
+    // Handle case where there's no practice data for the week
+    if (totalMinutes === 0 && daysPracticed === 0) {
+      return NextResponse.json({
+        insights: null,
+        generated: false,
+        message: "No practice data found for this week. Start practicing to generate insights!",
+        hasPracticeData: false
+      });
+    }
     
     // Calculate days hit goal using HISTORICAL goal targets
     const dailyTotals = new Map<string, number>();
@@ -199,7 +373,7 @@ export async function POST(req: Request) {
     let aiInsights: WeeklyInsights | null = null;
     if (totalMinutes > 0 && process.env.OPENAI_API_KEY) {
       try {
-        console.log("[api/weekly-insights] Generating AI insights...");
+        console.log(`[api/weekly-insights] Generating AI insights for week with ${daysPracticed} days practiced and ${totalMinutes} minutes...`);
         const aiService = getAIService();
         aiInsights = await aiService.generateWeeklyInsights(weekData);
         console.log("[api/weekly-insights] AI insights generated successfully");
@@ -207,9 +381,13 @@ export async function POST(req: Request) {
         console.error("[api/weekly-insights] AI generation failed:", aiError);
         // Continue without AI insights rather than failing completely
       }
+    } else if (totalMinutes > 0) {
+      // Generate basic insights even without AI
+      console.log(`[api/weekly-insights] Generating basic insights for week with ${daysPracticed} days practiced and ${totalMinutes} minutes (no AI available)`);
+      aiInsights = generateBasicInsights(weekData);
     }
 
-    // Store in database - match your existing schema
+    // Store in database - use core schema that should exist
     const insertData = {
       user_id: user.id,
       week_start: weekStart,
@@ -246,6 +424,7 @@ export async function POST(req: Request) {
       insights: savedInsights,
       generated: true,
       hasAI: !!aiInsights,
+      isAutoGenerated: body.autoGenerate,
       weekData: {
         totalMinutes,
         daysPracticed,

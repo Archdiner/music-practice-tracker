@@ -93,7 +93,14 @@ export default function Dashboard() {
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
             />
-            <WeeklyInsights onGenerated={bump} />
+            <WeeklyInsights 
+              onGenerated={bump} 
+              selectedDate={selectedDate}
+              onWeekChange={(weekStart) => {
+                // Clear selected date when navigating to a different week
+                setSelectedDate(null);
+              }}
+            />
           </div>
 
           {/* Right Column - 1/3 width */}

@@ -193,7 +193,10 @@ GUIDELINES:
 7. Celebrate consistency and progress
 8. ${weekData.overarchingGoal ? 'ALWAYS include at least ONE insight about progress toward their overarching goal' : 'Focus on general improvement'}
 9. ${weekData.overarchingGoal ? 'Connect practice activities to goal advancement when relevant' : ''}
-10. Maximum 4 insights, 3 recommendations`;
+10. Maximum 4 insights, 3 recommendations
+11. IMPORTANT: Even if only 1-2 days practiced, be encouraging and focus on the positive start
+12. For partial weeks, emphasize the value of any practice time and suggest building consistency
+13. Never make the user feel bad about practicing fewer days - celebrate any practice`;
 
     try {
       const completion = await this.openai.chat.completions.create({
