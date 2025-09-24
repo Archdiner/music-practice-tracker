@@ -87,7 +87,7 @@ export function CalendarHeatmap({
           <div className="text-sm text-muted-foreground">{error}</div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-53 gap-1 text-xs overflow-x-auto">
+            <div className="grid grid-cols-53 gap-1 text-xs overflow-hidden">
               {heatmapData.map((day, index) => (
                 <div
                   key={index}
@@ -97,8 +97,7 @@ export function CalendarHeatmap({
                 />
               ))}
             </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Less</span>
+            <div className="flex items-center justify-center text-xs text-muted-foreground">
               <div className="flex gap-1">
                 {[0, 1, 2, 3, 4].map((level) => (
                   <div
@@ -108,7 +107,6 @@ export function CalendarHeatmap({
                   />
                 ))}
               </div>
-              <span>More</span>
             </div>
           </div>
         )}
