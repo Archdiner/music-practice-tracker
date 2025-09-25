@@ -19,7 +19,9 @@ export async function GET(req: Request) {
       .from("practice_logs")
       .select("logged_at,total_minutes")
       .eq("user_id", user.id)
-      .gte("logged_at", from);
+      .gte("logged_at", from)
+      .order("logged_at", { ascending: false })
+      .limit(500);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 

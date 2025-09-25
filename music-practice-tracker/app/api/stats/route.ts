@@ -15,11 +15,19 @@ export async function GET() {
     const { data: prof } = await sb.from("profiles").select("daily_target").eq("id", user.id).maybeSingle();
     const target = prof?.daily_target ?? 20;
 
-    // Get ALL practice data (back to original working query)
+    // Get bounded practice data to avoid scanning entire history
+    const now = new Date();
+    const fromDate = new Date(now);
+    fromDate.setDate(fromDate.getDate() - 400); // supports 365-day streak + buffer
+    const fromKey = fromDate.toISOString().slice(0,10);
+
     const { data: rows } = await sb
       .from("practice_logs")
       .select("logged_at,total_minutes,activities")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .gte("logged_at", fromKey)
+      .order("logged_at", { ascending: false })
+      .limit(1000);
 
     // Properly aggregate multiple entries per day
     const byDate = new Map<string, number>();

@@ -182,7 +182,7 @@ export async function GET(req: Request) {
     // Get existing insights for this week
     const { data: existingInsights, error } = await sb
       .from("weekly_insights")
-      .select("*")
+      .select("week_start, created_at, summary, suggestions, metrics")
       .eq("user_id", user.id)
       .eq("week_start", weekStart)
       .single();
