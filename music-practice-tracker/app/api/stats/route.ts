@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-console.log("[api/stats] route module loaded");
+import logger from "@/lib/logger";
+logger.debug("api_stats_route_loaded");
 
 import { NextResponse } from "next/server";
 import { supaServer } from "@/lib/supabaseServer";
@@ -84,7 +85,7 @@ export async function GET() {
       categoryBreakdown 
     });
   } catch (e) {
-    console.error("[api/stats] GET failed", e);
+    logger.error("api_stats_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

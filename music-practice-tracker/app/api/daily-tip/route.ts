@@ -1,3 +1,5 @@
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,8 @@ export async function GET(req: Request) {
         .single();
 
       if (profile?.last_tip_date === today && profile?.last_tip_text) {
-        console.log("[api/daily-tip] Returning cached tip from profile");
+        const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+        reqLogger.info("api_daily_tip_returning_cached");
         return NextResponse.json({
           tip: profile.last_tip_text,
           cached: true,
@@ -43,7 +46,8 @@ export async function GET(req: Request) {
     }
 
     // No cached tip, need to generate new one
-    console.log("[api/daily-tip] No cached tip found, generating new one");
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger.info("api_daily_tip_generating_new");
 
     // Get user's current overarching goal
     const { data: overarchingGoal } = await sb
@@ -78,15 +82,16 @@ export async function GET(req: Request) {
     let dailyTip = null;
     if (process.env.OPENAI_API_KEY) {
       try {
-        console.log("[api/daily-tip] Generating new AI tip...");
+        const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+        reqLogger.info("api_daily_tip_ai_generate_start");
         const aiService = getAIService();
         dailyTip = await aiService.generateDailyTip(user.id, overarchingGoal, recentPractice || []);
-        console.log("[api/daily-tip] AI tip generated successfully");
+        reqLogger.info("api_daily_tip_ai_generate_success");
       } catch (aiError) {
         if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
           return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
         }
-        console.error("[api/daily-tip] AI generation failed:", aiError);
+        reqLogger.error("api_daily_tip_ai_generate_failed", { error: (aiError as Error)?.message });
         // Fallback to generic tip
         dailyTip = generateFallbackTip(overarchingGoal);
       }
@@ -106,9 +111,10 @@ export async function GET(req: Request) {
         }, {
           onConflict: 'id'
         });
-      console.log("[api/daily-tip] Tip cached in profile successfully");
+      const reqLogger2 = createRequestLogger({ requestId: getRequestIdFrom(req) });
+      reqLogger2.info("api_daily_tip_cache_success");
     } catch (cacheError) {
-      console.error("[api/daily-tip] Failed to cache tip:", cacheError);
+      reqLogger2.error("api_daily_tip_cache_failed", { error: (cacheError as Error)?.message });
       // Continue anyway - caching failure shouldn't break the response
     }
 
@@ -120,7 +126,8 @@ export async function GET(req: Request) {
     });
 
   } catch (e) {
-    console.error("[api/daily-tip] GET failed", e);
+    const reqLogger3 = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger3.error("api_daily_tip_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

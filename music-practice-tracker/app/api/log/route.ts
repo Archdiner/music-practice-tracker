@@ -1,6 +1,8 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-console.log("[api/log] route module loaded");
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
+logger.debug("api_log_route_loaded");
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -38,20 +40,20 @@ export async function POST(req: Request) {
     // Try AI parsing first if enabled
     if (body.useAI && process.env.OPENAI_API_KEY) {
       try {
-        console.log(`[api/log] Attempting AI parsing for: "${body.rawText}"`);
+        reqLogger.info("api_log_attempt_ai_parsing", { rawLength: body.rawText.length });
         const aiService = getAIService();
         parsed = await aiService.parseEntry(user.id, body.rawText, overarchingGoal || undefined);
         parsingMethod = "ai";
-        console.log(`[api/log] AI parsing successful:`, parsed);
+        reqLogger.info("api_log_ai_parsing_success", { activities: parsed.activities?.length ?? 0 });
       } catch (aiError) {
         if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
           return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
         }
-        console.log(`[api/log] AI parsing failed, falling back to heuristic:`, aiError);
+        reqLogger.warn("api_log_ai_parsing_failed_fallback", { error: (aiError as Error)?.message });
         parsed = parseHeuristic(body.rawText);
       }
     } else {
-      console.log(`[api/log] Using heuristic parsing (AI disabled or no API key)`);
+      reqLogger.info("api_log_using_heuristic_parsing");
       parsed = parseHeuristic(body.rawText);
     }
 
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
     });
 
     if (error) {
-      console.log(`[api/log] Error saving practice data: ${error.message}`);
+      reqLogger.warn("api_log_save_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
@@ -85,7 +87,8 @@ export async function POST(req: Request) {
       warnings 
     });
   } catch (e) {
-    console.error("[api/log] POST failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req as any) });
+    reqLogger.error("api_log_post_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

@@ -4,6 +4,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 
 const CreateGoalBody = z.object({
   text: z.string().min(1).max(100)
@@ -21,6 +23,7 @@ export async function GET() {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const reqLogger = createRequestLogger({ userId: user.id });
 
     const { data: goals, error } = await sb
       .from("practice_goals")
@@ -29,12 +32,14 @@ export async function GET() {
       .order("created_at", { ascending: true });
 
     if (error) {
+      reqLogger.warn("api_practice_goals_get_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ goals: goals || [] });
   } catch (e) {
-    console.error("[api/practice-goals] GET failed", e);
+    const reqLogger = createRequestLogger();
+    reqLogger.error("api_practice_goals_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -48,6 +53,7 @@ export async function POST(req: Request) {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const reqLogger = createRequestLogger({ userId: user.id, requestId: getRequestIdFrom(req) });
 
     const { data, error } = await sb
       .from("practice_goals")
@@ -60,12 +66,14 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
+      reqLogger.warn("api_practice_goals_post_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ goal: data });
   } catch (e) {
-    console.error("[api/practice-goals] POST failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger.error("api_practice_goals_post_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

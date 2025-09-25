@@ -1,3 +1,5 @@
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -38,13 +40,15 @@ export async function GET() {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error("[api/overarching-goals] GET failed", error);
+      const reqLogger = createRequestLogger();
+      reqLogger.warn("api_overarching_goals_get_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ goal: goal || null });
   } catch (e) {
-    console.error("[api/overarching-goals] GET failed", e);
+    const reqLogger = createRequestLogger();
+    reqLogger.error("api_overarching_goals_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -88,13 +92,15 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      console.error("[api/overarching-goals] POST error:", error);
+      const reqLogger = createRequestLogger();
+      reqLogger.warn("api_overarching_goals_post_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ goal: newGoal });
   } catch (e) {
-    console.error("[api/overarching-goals] POST failed", e);
+    const reqLogger = createRequestLogger();
+    reqLogger.error("api_overarching_goals_post_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -121,7 +127,8 @@ export async function PUT(req: Request) {
       .single();
 
     if (error) {
-      console.error("[api/overarching-goals] PUT error:", error);
+      const reqLogger = createRequestLogger();
+      reqLogger.warn("api_overarching_goals_put_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -131,7 +138,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ goal: updatedGoal });
   } catch (e) {
-    console.error("[api/overarching-goals] PUT failed", e);
+    const reqLogger = createRequestLogger();
+    reqLogger.error("api_overarching_goals_put_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -156,7 +164,8 @@ export async function DELETE() {
       .single();
 
     if (error) {
-      console.error("[api/overarching-goals] DELETE error:", error);
+      const reqLogger = createRequestLogger();
+      reqLogger.warn("api_overarching_goals_delete_query_error", { message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -166,7 +175,8 @@ export async function DELETE() {
 
     return NextResponse.json({ goal: pausedGoal });
   } catch (e) {
-    console.error("[api/overarching-goals] DELETE failed", e);
+    const reqLogger = createRequestLogger();
+    reqLogger.error("api_overarching_goals_delete_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

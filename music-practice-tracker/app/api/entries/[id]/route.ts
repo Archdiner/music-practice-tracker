@@ -1,3 +1,5 @@
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json({ entry });
   } catch (e) {
-    console.error("[api/entries/id] GET failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom() });
+    reqLogger.error("api_entries_id_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -63,20 +66,22 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     // Try AI parsing first if enabled
     if (body.useAI && process.env.OPENAI_API_KEY) {
       try {
-        console.log(`[api/entries/id] Attempting AI parsing for: "${body.rawText}"`);
+        const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(), userId: user.id });
+        reqLogger.info("api_entries_id_attempt_ai_parsing", { rawLength: body.rawText.length });
         const aiService = getAIService();
         parsed = await aiService.parseEntry(user.id, body.rawText, overarchingGoal || undefined);
         parsingMethod = "ai";
-        console.log(`[api/entries/id] AI parsing successful:`, parsed);
+        reqLogger.info("api_entries_id_ai_parsing_success", { activities: parsed.activities?.length ?? 0 });
       } catch (aiError) {
         if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
           return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
         }
-        console.log(`[api/entries/id] AI parsing failed, falling back to heuristic:`, aiError);
+        reqLogger.warn("api_entries_id_ai_parsing_failed_fallback", { error: (aiError as Error)?.message });
         parsed = parseHeuristic(body.rawText);
       }
     } else {
-      console.log(`[api/entries/id] Using heuristic parsing (AI disabled or no API key)`);
+      const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(), userId: user.id });
+      reqLogger.info("api_entries_id_using_heuristic_parsing");
       parsed = parseHeuristic(body.rawText);
     }
 
@@ -113,7 +118,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       warnings
     });
   } catch (e) {
-    console.error("[api/entries/id] PUT failed", e);
+    const reqLoggerPut = createRequestLogger({ requestId: getRequestIdFrom() });
+    reqLoggerPut.error("api_entries_id_put_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -192,7 +198,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     return NextResponse.json({ ok: true, entry: data, deletedActivity });
   } catch (e) {
-    console.error("[api/entries/id] DELETE failed", e);
+    const reqLoggerDelete = createRequestLogger({ requestId: getRequestIdFrom() });
+    reqLoggerDelete.error("api_entries_id_delete_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

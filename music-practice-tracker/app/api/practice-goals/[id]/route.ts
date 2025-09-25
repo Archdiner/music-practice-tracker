@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 
 const UpdateGoalBody = z.object({
   text: z.string().min(1).max(100).optional(),
@@ -42,7 +43,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json({ goal: data });
   } catch (e) {
-    console.error("[api/practice-goals] PUT failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger.error("api_practice_goals_id_put_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
@@ -74,7 +76,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     return NextResponse.json({ goal: data });
   } catch (e) {
-    console.error("[api/practice-goals] DELETE failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger.error("api_practice_goals_id_delete_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

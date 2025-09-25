@@ -1,5 +1,6 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+import logger from "@/lib/logger";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -188,7 +189,7 @@ export async function GET(req: Request) {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error("[api/weekly-insights] GET failed", error);
+      logger.warn("api_weekly_insights_get_select_error", { code: error.code, message: error.message });
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -312,7 +313,7 @@ export async function POST(req: Request) {
       .order("logged_at", { ascending: true });
 
     if (logsError) {
-      console.error("[api/weekly-insights] Error fetching week logs:", logsError);
+      logger.warn("api_weekly_insights_fetch_week_logs_error", { message: logsError.message });
       return NextResponse.json({ error: logsError.message }, { status: 400 });
     }
 
@@ -395,7 +396,7 @@ export async function POST(req: Request) {
     let aiInsights: WeeklyInsights | null = null;
     if (totalMinutes > 0 && process.env.OPENAI_API_KEY) {
       try {
-        console.log(`[api/weekly-insights] Generating AI insights for week with ${daysPracticed} days practiced and ${totalMinutes} minutes...`);
+        logger.info("api_weekly_insights_generate_ai_start", { daysPracticed, totalMinutes });
         const aiService = getAIService();
         aiInsights = await aiService.generateWeeklyInsights(user.id, weekData);
         console.log("[api/weekly-insights] AI insights generated successfully");
@@ -403,12 +404,12 @@ export async function POST(req: Request) {
         if (aiError instanceof RateLimitError || aiError instanceof QuotaExceededError) {
           return NextResponse.json({ error: aiError.message, code: aiError.name }, { status: 429 });
         }
-        console.error("[api/weekly-insights] AI generation failed:", aiError);
+        logger.error("api_weekly_insights_ai_generation_failed", { error: (aiError as Error)?.message });
         // Continue without AI insights rather than failing completely
       }
     } else if (totalMinutes > 0) {
       // Generate basic insights even without AI
-      console.log(`[api/weekly-insights] Generating basic insights for week with ${daysPracticed} days practiced and ${totalMinutes} minutes (no AI available)`);
+      logger.info("api_weekly_insights_generate_basic", { daysPracticed, totalMinutes });
       aiInsights = generateBasicInsights(weekData);
     }
 
@@ -441,7 +442,7 @@ export async function POST(req: Request) {
       .single();
 
     if (insertError) {
-      console.error("[api/weekly-insights] Insert error:", insertError);
+      logger.error("api_weekly_insights_upsert_error", { message: insertError.message });
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
@@ -459,7 +460,7 @@ export async function POST(req: Request) {
     });
 
   } catch (e) {
-    console.error("[api/weekly-insights] POST failed", e);
+    logger.error("api_weekly_insights_post_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

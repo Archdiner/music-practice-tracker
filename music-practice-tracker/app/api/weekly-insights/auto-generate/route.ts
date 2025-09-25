@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { supaServer } from "@/lib/supabaseServer";
+import logger from "@/lib/logger";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 
 // Helper function to get week boundaries (Monday to Sunday)
 function formatLocalYYYYMMDD(d: Date): string {
@@ -36,6 +38,7 @@ export async function POST(req: Request) {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const reqLogger = createRequestLogger({ userId: user.id, requestId: getRequestIdFrom(req) });
 
     const today = new Date();
     const currentWeek = getWeekBoundaries(today);
@@ -76,6 +79,7 @@ export async function POST(req: Request) {
 
     if (!generateResponse.ok) {
       const errorData = await generateResponse.json();
+      reqLogger.warn("api_weekly_auto_generate_failed_subcall", { status: generateResponse.status, error: errorData.error });
       throw new Error(errorData.error || 'Failed to generate insights');
     }
 
@@ -89,7 +93,9 @@ export async function POST(req: Request) {
     });
 
   } catch (e) {
-    console.error("[api/weekly-insights/auto-generate] POST failed", e);
+    const reqId = getRequestIdFrom(req);
+    const reqLogger = createRequestLogger({ requestId: reqId });
+    reqLogger.error("api_weekly_auto_generate_post_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ 
       error: "internal",
       message: e instanceof Error ? e.message : "Internal server error"
@@ -104,6 +110,7 @@ export async function GET(req: Request) {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const reqLogger = createRequestLogger({ userId: user.id, requestId: getRequestIdFrom(req) });
 
     const today = new Date();
     const currentWeek = getWeekBoundaries(today);
@@ -136,7 +143,9 @@ export async function GET(req: Request) {
     });
 
   } catch (e) {
-    console.error("[api/weekly-insights/auto-generate] GET failed", e);
+    const reqId = getRequestIdFrom(req);
+    const reqLogger = createRequestLogger({ requestId: reqId });
+    reqLogger.error("api_weekly_auto_generate_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

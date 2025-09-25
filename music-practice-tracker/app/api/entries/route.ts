@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
+import { createRequestLogger, getRequestIdFrom } from "@/lib/requestLogger";
 
 // GET: Retrieve entries for a specific date or date range
 export async function GET(req: Request) {
@@ -43,7 +44,8 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ entries, count: entries?.length || 0 });
   } catch (e) {
-    console.error("[api/entries] GET failed", e);
+    const reqLogger = createRequestLogger({ requestId: getRequestIdFrom(req) });
+    reqLogger.error("api_entries_get_failed", { error: (e as Error)?.message, stack: (e as Error)?.stack });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
