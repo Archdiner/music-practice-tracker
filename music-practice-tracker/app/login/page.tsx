@@ -150,7 +150,7 @@ function LoginContent() {
               theme: ThemeSupa,
               variables: customTheme
             }} 
-            providers={[]}
+            providers={["google"]}
             redirectTo={typeof window !== 'undefined' ? 
               (window.location.hostname === 'localhost' ? `${window.location.origin}/auth/callback` : 'https://note-log-lac.vercel.app/auth/callback') : 
               'https://note-log-lac.vercel.app/auth/callback'
