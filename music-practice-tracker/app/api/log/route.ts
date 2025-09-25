@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     const user = auth?.user;
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+    const reqLogger = createRequestLogger({ userId: user.id, requestId: getRequestIdFrom(req) });
+
     let parsed;
     let parsingMethod = "heuristic";
 
