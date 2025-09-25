@@ -23,6 +23,7 @@ export function GoalSetting({ onGoalChange }: { onGoalChange?: () => void }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -81,6 +82,7 @@ export function GoalSetting({ onGoalChange }: { onGoalChange?: () => void }) {
     try {
       setSaving(true);
       setError(null);
+      setWarnings([]);
 
       const method = goal ? 'PUT' : 'POST';
       const response = await fetch('/api/overarching-goals', {
@@ -91,13 +93,20 @@ export function GoalSetting({ onGoalChange }: { onGoalChange?: () => void }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to save goal: ${response.status}`);
+        throw new Error(errorData.message || errorData.error || `Failed to save goal: ${response.status}`);
       }
 
       const data = await response.json();
       setGoal(data.goal);
       setEditing(false);
       onGoalChange?.();
+
+      // Client-side non-blocking warning
+      const text = `${formData.title} ${formData.description}`.toLowerCase();
+      const hasMusic = /(music|practice|guitar|piano|violin|cello|drums|bass|sax|trumpet|flute|clarinet|sing|vocal|scale|arpeggio|chord|harmony|theory|ear|transcription|repertoire|piece|song|etude|record|mix|production|metronome|tempo|rhythm|sight[- ]?reading|improv|improvisation|composition)/i.test(text);
+      if (!hasMusic) {
+        setWarnings(["This goal may not be music-related. Consider mentioning a piece, instrument, or technique."]);
+      }
     } catch (err) {
       console.error('Failed to save goal:', err);
       setError(err instanceof Error ? err.message : 'Failed to save goal');
@@ -200,6 +209,16 @@ export function GoalSetting({ onGoalChange }: { onGoalChange?: () => void }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {warnings.length > 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800 font-medium mb-1">Heads up</p>
+            <ul className="list-disc ml-5 text-sm text-amber-800">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-600">{error}</p>

@@ -17,6 +17,7 @@ export function TodayCard({
   const [notes, setNotes] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [warnings, setWarnings] = useState<string[]>([])
   const [todayEntries, setTodayEntries] = useState<any[]>([])
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -213,6 +214,7 @@ export function TodayCard({
 
   async function save(rawText: string) {
     setErr(null)
+    setWarnings([])
     if (!rawText.trim()) return;
     setIsSaving(true)
     try {
@@ -220,16 +222,23 @@ export function TodayCard({
       const res = await fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText, date: dateToSave })
+        body: JSON.stringify({ rawText, date: dateToSave, validateAI: true })
       })
       if (res.status === 401) {
         if (typeof window !== "undefined") window.location.href = "/login";
         return;
       }
       if (!res.ok) {
-        const j = await res.json().catch(() => ({} as { error?: string }));
-        setErr((j as { error?: string })?.error ?? "Failed to save");
+        const j = await res.json().catch(() => ({} as { error?: string; message?: string }));
+        const msg = (j as { message?: string; error?: string }).message || (j as { error?: string }).error;
+        setErr(msg ?? "Failed to save");
         return;
+      }
+      const j = await res.json().catch(() => ({} as any));
+      if (Array.isArray(j?.warnings) && j.warnings.length > 0) {
+        setWarnings(j.warnings);
+      } else {
+        setWarnings([]);
       }
       setNotes("")
       // Reload entries after successful save
@@ -273,6 +282,16 @@ export function TodayCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {warnings.length > 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800 font-medium mb-1">Heads up</p>
+            <ul className="list-disc ml-5 text-sm text-amber-800">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {/* Daily Tip Section */}
         {dailyTip && (
           <div className="p-3 bg-apricot/5 border border-apricot/20 rounded-lg">
