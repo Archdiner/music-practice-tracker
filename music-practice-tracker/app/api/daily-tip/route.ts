@@ -111,10 +111,9 @@ export async function GET(req: Request) {
         }, {
           onConflict: 'id'
         });
-      const reqLogger2 = createRequestLogger({ requestId: getRequestIdFrom(req) });
-      reqLogger2.info("api_daily_tip_cache_success");
+      reqLogger.info("api_daily_tip_cache_success");
     } catch (cacheError) {
-      reqLogger2.error("api_daily_tip_cache_failed", { error: (cacheError as Error)?.message });
+      reqLogger.error("api_daily_tip_cache_failed", { error: (cacheError as Error)?.message });
       // Continue anyway - caching failure shouldn't break the response
     }
 
