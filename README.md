@@ -120,7 +120,3 @@ npm run start
   "lint": "next lint"
 }
 ```
-
-## License
-
-MIT © 2025
