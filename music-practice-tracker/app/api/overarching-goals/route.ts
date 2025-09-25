@@ -6,16 +6,16 @@ import { z } from "zod";
 import { supaServer } from "@/lib/supabaseServer";
 
 const CreateGoalBody = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().optional(),
+  title: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(0).max(600).optional(),
   goal_type: z.enum(["piece", "exam", "technique", "performance", "general"]),
   difficulty_level: z.enum(["beginner", "intermediate", "advanced"]).optional(),
   target_date: z.string().optional() // ISO date string
 });
 
 const UpdateGoalBody = z.object({
-  title: z.string().min(1).max(200).optional(),
-  description: z.string().optional(),
+  title: z.string().trim().min(3).max(120).optional(),
+  description: z.string().trim().min(0).max(600).optional(),
   goal_type: z.enum(["piece", "exam", "technique", "performance", "general"]).optional(),
   difficulty_level: z.enum(["beginner", "intermediate", "advanced"]).optional(),
   target_date: z.string().optional(),

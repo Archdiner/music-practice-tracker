@@ -8,9 +8,10 @@ import { getAIService, parseHeuristic } from "@/lib/aiService";
 import { RateLimitError, QuotaExceededError } from "@/lib/aiUsage";
 
 const UpdateBody = z.object({
-  rawText: z.string().min(1),
+  rawText: z.string().trim().min(3).max(2000),
   date: z.string().optional(),
-  useAI: z.boolean().optional().default(true) // Allow disabling AI for testing
+  useAI: z.boolean().optional().default(true), // Allow disabling AI for testing
+  validateAI: z.boolean().optional().default(false) // Optional non-blocking validation
 });
 
 // GET: Retrieve a specific entry by ID
@@ -95,11 +96,21 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     if (!data) return NextResponse.json({ error: "Entry not found or access denied" }, { status: 404 });
 
+    // Optional non-blocking validation: flag odd entries, don't block
+    let warnings: string[] = [];
+    if (body.validateAI) {
+      const hasMusic = /(music|practice|guitar|piano|violin|cello|drums|bass|sax|trumpet|flute|clarinet|sing|vocal|scale|arpeggio|chord|harmony|theory|ear|transcription|repertoire|piece|song|etude|record|mix|production|metronome|tempo|rhythm|sight[- ]?reading|improv|improvisation|composition)/i.test(body.rawText);
+      if (!hasMusic) warnings.push("This doesn't look music-related. Consider adding instrument, piece, or technique.");
+      const total = parsed.total_minutes ?? 0;
+      if (total <= 0 || total > 240) warnings.push("Session length seems unrealistic (must be 1-240 minutes).");
+    }
+
     return NextResponse.json({ 
       ok: true, 
       entry: data,
       parsing_method: parsingMethod,
-      parsed_data: parsed 
+      parsed_data: parsed,
+      warnings
     });
   } catch (e) {
     console.error("[api/entries/id] PUT failed", e);

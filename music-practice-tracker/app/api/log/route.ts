@@ -9,9 +9,10 @@ import { getAIService, parseHeuristic } from "@/lib/aiService";
 import { RateLimitError, QuotaExceededError } from "@/lib/aiUsage";
 
 const Body = z.object({ 
-  rawText: z.string().min(1), 
+  rawText: z.string().trim().min(3).max(2000), 
   date: z.string().optional(),
-  useAI: z.boolean().optional().default(true) // Allow disabling AI for testing
+  useAI: z.boolean().optional().default(true), // Allow disabling AI for testing
+  validateAI: z.boolean().optional().default(false) // Optional non-blocking validation
 });
 
 export async function POST(req: Request) {
@@ -67,11 +68,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     
+    // Optional non-blocking validation: flag odd entries, don't block
+    let warnings: string[] = [];
+    if (body.validateAI) {
+      const hasMusic = /(music|practice|guitar|piano|violin|cello|drums|bass|sax|trumpet|flute|clarinet|sing|vocal|scale|arpeggio|chord|harmony|theory|ear|transcription|repertoire|piece|song|etude|record|mix|production|metronome|tempo|rhythm|sight[- ]?reading|improv|improvisation|composition)/i.test(body.rawText);
+      if (!hasMusic) warnings.push("This doesn't look music-related. Consider adding instrument, piece, or technique.");
+      const total = parsed.total_minutes ?? 0;
+      if (total <= 0 || total > 240) warnings.push("Session length seems unrealistic (must be 1-240 minutes).");
+    }
+
     return NextResponse.json({ 
       ok: true, 
       log: data, 
       parsing_method: parsingMethod,
-      parsed_data: parsed 
+      parsed_data: parsed,
+      warnings 
     });
   } catch (e) {
     console.error("[api/log] POST failed", e);
