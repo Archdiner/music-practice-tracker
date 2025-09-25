@@ -1,4 +1,5 @@
 import { supaServer } from "@/lib/supabaseServer";
+import logger from "@/lib/logger";
 
 export class RateLimitError extends Error {
   constructor(message = "rate limit exceeded") {
@@ -102,15 +103,40 @@ export async function enforceAiLimits(userId: string, opts: EnforceOptions): Pro
 
 export async function recordAiUsage(params: RecordUsageParams): Promise<void> {
   const sb = supaServer();
-  // Store even if tokens are null so we can still count requests
-  await sb.from("ai_usage").insert({
-    user_id: params.userId,
-    endpoint: params.endpoint,
-    model: params.model,
-    prompt_tokens: params.promptTokens ?? null,
-    completion_tokens: params.completionTokens ?? null,
-    total_tokens: (params.totalTokens ?? ((params.promptTokens ?? 0) + (params.completionTokens ?? 0))) ?? null,
-  });
+  const totalTokens = (params.totalTokens ?? ((params.promptTokens ?? 0) + (params.completionTokens ?? 0))) ?? null;
+  const costUsd = totalTokens != null ? calculateCost(params.model, totalTokens) : null;
+  try {
+    await sb.from("ai_usage").insert({
+      user_id: params.userId,
+      endpoint: params.endpoint,
+      model: params.model,
+      prompt_tokens: params.promptTokens ?? null,
+      completion_tokens: params.completionTokens ?? null,
+      total_tokens: totalTokens,
+      cost_usd: costUsd,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    });
+  } catch (error: any) {
+    // Do not fail main request on telemetry error
+    logger.error('ai_usage_tracking_failed', {
+      userId: params.userId,
+      endpoint: params.endpoint,
+      model: params.model,
+      error: error?.message
+    });
+  }
+}
+
+function calculateCost(model: string, tokens: number): number | null {
+  if (!Number.isFinite(tokens)) return null;
+  // Approximate rates per 1K tokens (USD). Adjust as needed.
+  const per1k: Record<string, number> = {
+    'gpt-4o-mini': 0.15 / 1000, // $0.15 / 1K
+    'gpt-4': 0.03 / 1000
+  };
+  const rate = per1k[model] ?? (0.15 / 1000);
+  return Math.round(tokens * rate * 1e6) / 1e6; // round to 6 decimals
 }
 
 
