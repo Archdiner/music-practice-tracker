@@ -1,5 +1,6 @@
 import { supaServer } from "@/lib/supabaseServer";
 import logger from "@/lib/logger";
+import { checkRateLimit } from "@/lib/rateLimiter";
 
 export class RateLimitError extends Error {
   constructor(message = "rate limit exceeded") {
@@ -98,6 +99,13 @@ export async function enforceAiLimits(userId: string, opts: EnforceOptions): Pro
   const projected = usedThisMonth + (opts.estimatedTotalTokens || 0);
   if (projected > tokensPerMonth) {
     throw new QuotaExceededError("Monthly AI token quota reached");
+  }
+
+  // Distributed/global rate limit (Redis if available, memory fallback otherwise)
+  try {
+    await checkRateLimit(userId, opts.endpoint);
+  } catch (e: any) {
+    throw new RateLimitError(e?.message || "Rate limit exceeded");
   }
 }
 
