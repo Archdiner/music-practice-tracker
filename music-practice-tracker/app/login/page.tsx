@@ -110,6 +110,16 @@ function LoginContent() {
     },
   };
 
+  // Custom labels for Google button based on view
+  const customLabels = {
+    sign_in: {
+      social_provider_text: 'Continue with Google',
+    },
+    sign_up: {
+      social_provider_text: 'Sign up with Google',
+    },
+  };
+
   if (isRedirecting) {
     return (
       <main className="min-h-dvh flex items-center justify-center bg-background">
@@ -151,6 +161,9 @@ function LoginContent() {
               variables: customTheme
             }} 
             providers={["google"]}
+            localization={{
+              variables: customLabels
+            }}
             redirectTo={typeof window !== 'undefined' ? 
               (window.location.hostname === 'localhost' ? `${window.location.origin}/auth/callback` : 'https://note-log-lac.vercel.app/auth/callback') : 
               'https://note-log-lac.vercel.app/auth/callback'
